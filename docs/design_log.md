@@ -87,3 +87,12 @@ Based on 2-3 hours of focused daily development, the total project timeline is e
 * Developed `tests/test_opus.cpp` to verify the capture-encode-decode-WAV loopback pipeline.
 * Compiled and ran `./build/bin/test_opus` successfully, proving transparent audio compression and reconstruction.
 
+### 2026-06-23 (Phase 3 Execution: UDP Sockets & RTP Transport)
+* Implemented standard 12-byte RTP packet serialization helper `packRtpHeader` in `core/include/rtp_packet.h`.
+* Developed `UdpSender` wrapper in `core/include/udp_sender.h` and `core/src/udp_sender.cpp` utilizing socket connections and optimized OS buffers (`SO_SNDBUF` to 8KB) to prevent network backlog lag.
+* Modified root and library `CMakeLists.txt` to build `udp_sender.cpp` and define the `test_sender` runner target.
+* Created `tests/stream.sdp` session description descriptor for media players.
+* Developed `tests/test_sender.cpp` to drive the loopback capture-encode-RTP-UDP network streaming.
+* Verified real-time streaming locally by running the sender and listening through `ffplay` with low latency.
+
+

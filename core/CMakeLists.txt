@@ -69,6 +69,7 @@ add_library(audiostream_core STATIC
     src/pulse_capture.cpp
     src/opus_encoder.cpp
     src/opus_decoder.cpp
+    src/udp_sender.cpp
 )
 
 # Set compile definitions and include directories

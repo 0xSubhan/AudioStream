@@ -1,0 +1,46 @@
+# ==============================================================================
+# AudioStream .gitignore
+# ==============================================================================
+
+# 1. Build & Compilation Artifacts
+build/
+bin/
+lib/
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles/
+CMakeTargetDirectories.txt
+Makefile
+cmake_install.cmake
+compile_commands.json
+
+# 2. Local Libraries & Package Extractions (keep the folder but ignore the contents)
+third_party/extracted/
+third_party/debs/
+
+# 3. Compiled Objects
+*.o
+*.a
+*.so
+*.so.*
+*.la
+*.lo
+*.dylib
+*.dll
+*.exe
+
+# 4. Test Recordings & Temporary Media
+*.wav
+output_capture.wav
+
+# 5. IDE & Editor Files
+.vscode/
+.clangd
+.cache/
+.~lock.*
+.idea/
+*.suo
+*.user
+*.ncb
+*.pdb
+.DS_Store

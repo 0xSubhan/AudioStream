@@ -67,6 +67,8 @@ endif()
 # Define the core library
 add_library(audiostream_core STATIC
     src/pulse_capture.cpp
+    src/opus_encoder.cpp
+    src/opus_decoder.cpp
 )
 
 # Set compile definitions and include directories
@@ -80,4 +82,5 @@ target_include_directories(audiostream_core PUBLIC
 target_link_libraries(audiostream_core PUBLIC
     ${PULSE_LIBRARY}
     ${PULSE_SIMPLE_LIBRARY}
+    ${OPUS_LIBRARY}
 )

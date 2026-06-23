@@ -79,3 +79,11 @@ Based on 2-3 hours of focused daily development, the total project timeline is e
 * Compiled targets successfully.
 * Ran `./build/bin/test_capture` and successfully recorded 5 seconds of system audio, creating a valid `output_capture.wav` file (938 KB).
 * Created `.vscode/c_cpp_properties.json` and `.clangd` configuration files and updated `#include` directives to relative paths to resolve IDE search path warnings (red squiggles).
+
+### 2026-06-23 (Phase 2 Execution: Opus Compression & Decompression)
+* Implemented `OpusEncoder` wrapper in `core/include/opus_encoder.h` and `core/src/opus_encoder.cpp` configured for low-latency VBR (Variable Bitrate) audio.
+* Implemented `OpusDecoder` wrapper in `core/include/opus_decoder.h` and `core/src/opus_decoder.cpp` for real-time decompressing.
+* Modified `core/CMakeLists.txt` and root `CMakeLists.txt` to compile new source files, link `audiostream_core` against `libopus`, and define the `test_opus` target.
+* Developed `tests/test_opus.cpp` to verify the capture-encode-decode-WAV loopback pipeline.
+* Compiled and ran `./build/bin/test_opus` successfully, proving transparent audio compression and reconstruction.
+

@@ -99,8 +99,8 @@ int main(int argc, char* argv[]) {
         int totalPacketSize = sizeof(audiostream::RtpHeader) + encodedBytes;
         int sentBytes = sender.send(packetBuffer.data(), totalPacketSize);
         if (sentBytes < 0) {
-            std::cerr << "[ERROR] Network send failed." << std::endl;
-            break;
+            // We ignore transmission errors (like ECONNREFUSED) so the sender doesn't crash
+            // if the receiver hasn't started listening yet.
         }
 
         // 4. Update sequence counter and timestamp step size

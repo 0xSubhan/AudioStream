@@ -69,7 +69,10 @@ int UdpSender::send(const uint8_t* data, int len) {
     // Standard send() can be used because the socket is pre-connected.
     int bytesSent = ::send(socketFd_, data, len, 0);
     if (bytesSent < 0) {
-        std::cerr << "[UdpSender] send() failed: " << std::strerror(errno) << std::endl;
+        // Suppress ECONNREFUSED logging to prevent console spam when the receiver is offline.
+        if (errno != ECONNREFUSED) {
+            std::cerr << "[UdpSender] send() failed: " << std::strerror(errno) << std::endl;
+        }
     }
     return bytesSent;
 }

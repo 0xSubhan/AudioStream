@@ -95,4 +95,13 @@ Based on 2-3 hours of focused daily development, the total project timeline is e
 * Developed `tests/test_sender.cpp` to drive the loopback capture-encode-RTP-UDP network streaming.
 * Verified real-time streaming locally by running the sender and listening through `ffplay` with low latency.
 
+### 2026-06-24 (Phase 4 Execution: pybind11 C++ Bindings & PyQt6 PC UI)
+* Designed and implemented `StreamController` class in `core/include/stream_controller.h` and `core/src/stream_controller.cpp`. This class wraps the capture-encode-stream engine and runs it in a background `std::thread`, using atomic primitives (`std::atomic<bool>`, `std::atomic<float>`, `std::atomic<int>`) for thread-safe telemetry access.
+* Implemented Python binding wrapper in `core/src/bindings.cpp` using `pybind11`, exposing the C++ `StreamController` class, its lifecycle controls (`start()`, `stop()`), and live telemetry methods directly to Python.
+* Configured local Python virtual environment (`venv/`) and defined application dependencies in `pc_app/requirements.txt`.
+* Updated root and core library `CMakeLists.txt` files to dynamically query the python environment's `pybind11` configuration, generate the `audiostream_core` shared library module, and output it directly to the `pc_app/` folder for seamless import.
+* Developed the PyQt6 desktop client application `pc_app/app.py` featuring a premium dark mode, glassmorphism telemetry cards, and dynamic UI updates via a `QTimer` query loop.
+* Integrated thread-safe mDNS auto-discovery in `pc_app/app.py` using `zeroconf` which listens for remote receivers and safely propagates events to the main Qt event loop using custom signals.
+
+
 

@@ -44,3 +44,10 @@ output_capture.wav
 *.ncb
 *.pdb
 .DS_Store
+
+# 6. Python Virtual Environments and PyCache
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.so

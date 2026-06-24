@@ -70,6 +70,7 @@ add_library(audiostream_core STATIC
     src/opus_encoder.cpp
     src/opus_decoder.cpp
     src/udp_sender.cpp
+    src/stream_controller.cpp
 )
 
 # Set compile definitions and include directories

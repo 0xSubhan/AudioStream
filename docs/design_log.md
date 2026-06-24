@@ -103,5 +103,16 @@ Based on 2-3 hours of focused daily development, the total project timeline is e
 * Developed the PyQt6 desktop client application `pc_app/app.py` featuring a premium dark mode, glassmorphism telemetry cards, and dynamic UI updates via a `QTimer` query loop.
 * Integrated thread-safe mDNS auto-discovery in `pc_app/app.py` using `zeroconf` which listens for remote receivers and safely propagates events to the main Qt event loop using custom signals.
 
+### 2026-06-24 (Phase 5 Execution: Android App Receiver & AAudio Engine)
+* Created a zero-dependency Flutter app configuration under `android_app/` with a high-fidelity, glowing, dark-themed user interface.
+* Implemented `JitterBuffer` in `android_app/android/app/src/main/cpp/jitter_buffer.h` utilizing std::map sorting to automatically order incoming RTP packets, absorb packet arrival jitter, and signal packet gaps to the decoder.
+* Implemented `ReceiverEngine` in `android_app/android/app/src/main/cpp/android_receiver_engine.cpp` which receives UDP packets on port 8554 and plays them back using the low-latency native **AAudio** NDK API.
+* Configured AAudio in low-latency performance mode (`AAUDIO_PERFORMANCE_MODE_LOW_LATENCY`) and exclusive device sharing mode (`AAUDIO_SHARING_MODE_EXCLUSIVE`) for sub-10ms driver playback.
+* Integrated Opus decoding and Packet Loss Concealment (PLC) inside the C++ audio thread to guarantee zero JNI crossing overhead in the fast rendering path.
+* Created `android_app/android/app/src/main/cpp/CMakeLists.txt` using CMake's built-in `FetchContent` module to automatically download and compile the Opus codec from source for the target Android device's instruction set architecture.
+* Developed `ReceiverEngine.kt` to bind native C++ methods to Kotlin.
+* Implemented mDNS service advertisement in `android_app/android/app/src/main/kotlin/com/audiostream/audiostream_app/MainActivity.kt` using Android's native `NsdManager`, broadcasting the phone model dynamically on WiFi (e.g. `AudioStream-Pixel 6a`).
+
+
 
 

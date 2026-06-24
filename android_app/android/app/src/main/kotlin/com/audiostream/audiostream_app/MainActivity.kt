@@ -37,7 +37,9 @@ class MainActivity : FlutterActivity() {
                 "getStats" -> {
                     val stats = mapOf(
                         "packetCount" to ReceiverEngine.nativeGetPacketCount(),
-                        "underrunCount" to ReceiverEngine.nativeGetUnderrunCount()
+                        "underrunCount" to ReceiverEngine.nativeGetUnderrunCount(),
+                        "jitterMs" to ReceiverEngine.nativeGetJitterMs(),
+                        "targetDelay" to ReceiverEngine.nativeGetTargetDelayPackets()
                     )
                     result.success(stats)
                 }

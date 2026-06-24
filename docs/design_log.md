@@ -38,16 +38,16 @@ This document serves as a persistent record of architectural decisions, planning
 ## 3. Total Project Time Estimate
 Based on 2-3 hours of focused daily development, the total project timeline is estimated at **21 to 24 weeks (~5.5 to 6 months)**:
 
-* **Phase 0: Foundation & Directory Structure**: 1 week
-* **Phase 1: Audio Capture (WASAPI / PulseAudio)**: 2-3 weeks (Current Phase)
-* **Phase 2: Opus Encoder & Decoder (C++)**: 1-2 weeks
-* **Phase 3: UDP Transport & RTP Layer (C++)**: 2 weeks
-* **Phase 4: pybind11 bindings & PyQt6 PC UI**: 1-2 weeks
-* **Phase 5: Android App (Flutter + Oboe)**: 3-4 weeks
-* **Phase 6: mDNS Zeroconf Discovery**: 1 week
-* **Phase 7: Latency Optimization (Adaptive Jitter)**: 2-3 weeks
-* **Phase 8: Cross-Platform & Linux Testing**: 2 weeks
-* **Phase 9: Polishing, Packaging & Beta Release**: 3-4 weeks
+* **Phase 0: Foundation & Directory Structure**: 1 week (Completed)
+* **Phase 1: Audio Capture (WASAPI / PulseAudio)**: 2-3 weeks (Completed)
+* **Phase 2: Opus Encoder & Decoder (C++)**: 1-2 weeks (Completed)
+* **Phase 3: UDP Transport & RTP Layer (C++)**: 2 weeks (Completed)
+* **Phase 4: pybind11 bindings & PyQt6 PC UI**: 1-2 weeks (Completed)
+* **Phase 5: Android App (Flutter + AAudio)**: 3-4 weeks (Completed)
+* **Phase 6: mDNS Zeroconf Discovery**: 1 week (Completed)
+* **Phase 7: Latency Optimization (Adaptive Jitter)**: 2-3 weeks (Completed)
+* **Phase 8: Cross-Platform & Linux Testing**: 2 weeks (Completed)
+* **Phase 9: Polishing, Packaging & Beta Release**: 3-4 weeks (Current Phase)
 
 ---
 
@@ -111,7 +111,25 @@ Based on 2-3 hours of focused daily development, the total project timeline is e
 * Integrated Opus decoding and Packet Loss Concealment (PLC) inside the C++ audio thread to guarantee zero JNI crossing overhead in the fast rendering path.
 * Created `android_app/android/app/src/main/cpp/CMakeLists.txt` using CMake's built-in `FetchContent` module to automatically download and compile the Opus codec from source for the target Android device's instruction set architecture.
 * Developed `ReceiverEngine.kt` to bind native C++ methods to Kotlin.
-* Implemented mDNS service advertisement in `android_app/android/app/src/main/kotlin/com/audiostream/audiostream_app/MainActivity.kt` using Android's native `NsdManager`, broadcasting the phone model dynamically on WiFi (e.g. `AudioStream-Pixel 6a`).
+
+### 2026-06-25 (Phase 6 Execution: mDNS Zeroconf Discovery)
+* Configured Android service registration in `android_app/android/app/src/main/kotlin/com/audiostream/audiostream_app/MainActivity.kt` using `NsdManager` to dynamically broadcast the receiver's device name (e.g., `AudioStream-Pixel 6a`) on the local network under the `_audiostream._udp` service type.
+* Implemented a background discovery browser in `pc_app/app.py` using the `zeroconf` library to scan for active `_audiostream._udp.local.` services.
+* Integrated a thread-safe `DiscoverySignaler` using PyQt6 custom signals in `pc_app/app.py` to safely propagate device additions and removals from the background Zeroconf thread to the main UI event loop.
+* Updated the PyQt6 `MainWindow` connection manager to dynamically update the device dropdown list and auto-populate target IP and port parameters upon receiver selection.
+
+### 2026-06-25 (Phase 7 Execution: Latency Optimization & Adaptive Jitter)
+* Designed and implemented dynamic inter-arrival jitter estimation in `android_app/android/app/src/main/cpp/jitter_buffer.h` adhering to RFC 3550 standard formulas.
+* Added auto-scaling buffer target delay (`targetDelay_`) clamping between 2 packets (40ms) and 8 packets (160ms) based on real-time packet arrival delay variance.
+* Implemented queue-draining catch-up mechanism in C++: When the buffer queue size exceeds `targetDelay_ + 2` packets, the buffer discards older frames and advances `nextSeq_` to immediately recover low latency.
+* Extended C++ JNI interface, Kotlin bindings (`ReceiverEngine.kt`), and Flutter native method channels (`MainActivity.kt`) to expose real-time estimated jitter and target buffer latency telemetry.
+* Redesigned the Flutter UI dashboard with a premium 2x2 grid card showing Packets Received, Starvations, Estimated Jitter (with dynamic color warning thresholds), and Target Buffer Latency.
+
+### 2026-06-25 (Phase 8 Execution: Cross-Platform & Linux Testing)
+* Configured and compiled the full CMake C++ workspace on Linux, building targets `audiostream_core`, `test_capture`, `test_opus`, `test_sender`, and Python pybind11 wrappers `audiostream_pybindings`.
+* Successfully executed `./build/bin/test_capture` on Linux, validating PulseAudio monitor loopback capture and writing 5 seconds of captured system audio to a valid `.wav` file (`output_capture.wav`).
+* Successfully executed `./build/bin/test_opus` on Linux, validating the real-time Opus capture-encode-decode pipeline and writing a fully reconstructed `.wav` file (`output_opus.wav`).
+* Verified Python pybind11 import compatibility by successfully importing `audiostream_core` from within the virtual environment Python interpreter.
 
 
 

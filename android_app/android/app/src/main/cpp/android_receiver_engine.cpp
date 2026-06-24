@@ -156,6 +156,8 @@ public:
 
     int getPacketCount() const { return packetCount_.load(); }
     int getUnderrunCount() const { return underrunCount_.load(); }
+    double getJitterMs() const { return jitterBuffer_.getJitterMs(); }
+    int getTargetDelayPackets() const { return static_cast<int>(jitterBuffer_.getTargetDelayPackets()); }
 
 private:
     static aaudio_data_callback_result_t dataCallback(
@@ -304,6 +306,16 @@ Java_com_audiostream_audiostream_1app_ReceiverEngine_nativeGetPacketCount(JNIEnv
 JNIEXPORT jint JNICALL
 Java_com_audiostream_audiostream_1app_ReceiverEngine_nativeGetUnderrunCount(JNIEnv* env, jobject thiz) {
     return audiostream::g_receiverEngine.getUnderrunCount();
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_audiostream_audiostream_1app_ReceiverEngine_nativeGetJitterMs(JNIEnv* env, jobject thiz) {
+    return audiostream::g_receiverEngine.getJitterMs();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_audiostream_audiostream_1app_ReceiverEngine_nativeGetTargetDelayPackets(JNIEnv* env, jobject thiz) {
+    return audiostream::g_receiverEngine.getTargetDelayPackets();
 }
 
 }

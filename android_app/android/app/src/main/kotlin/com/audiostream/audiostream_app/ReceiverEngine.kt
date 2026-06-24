@@ -10,4 +10,6 @@ object ReceiverEngine {
     external fun nativeStop()
     external fun nativeGetPacketCount(): Int
     external fun nativeGetUnderrunCount(): Int
+    external fun nativeGetJitterMs(): Double
+    external fun nativeGetTargetDelayPackets(): Int
 }

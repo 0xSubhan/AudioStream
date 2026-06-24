@@ -258,6 +258,7 @@ private:
 
     void cleanupSocket() {
         if (socketFd_ >= 0) {
+            shutdown(socketFd_, SHUT_RDWR);
             close(socketFd_);
             socketFd_ = -1;
         }

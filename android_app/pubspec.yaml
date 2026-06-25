@@ -1,7 +1,7 @@
 name: audiostream_app
-description: "AudioStream Receiver Android Application."
+description: "AudioStream Receiver — Low-latency WiFi audio streaming for Android."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -14,6 +14,17 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.1
+  flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon.png
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon.png"
+  min_sdk_android: 26
+  adaptive_icon_background: "#121214"
+  adaptive_icon_foreground: "assets/icon.png"

@@ -3,10 +3,10 @@ import socket
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit, QComboBox, QFrame, QGridLayout,
-    QStyle
+    QMessageBox
 )
 from PyQt6.QtCore import QTimer, pyqtSignal, QObject
-from PyQt6.QtGui import QFont, QColor, QPalette
+from PyQt6.QtGui import QFont, QColor, QPalette, QIcon
 
 # mDNS/Zeroconf imports
 from zeroconf import Zeroconf, ServiceBrowser, ServiceListener
@@ -22,7 +22,7 @@ except ImportError:
         def stop(self): self._active = False
         def is_streaming(self): return self._active
         def get_latency_ms(self): return 1.85 if self._active else 0.0
-        def get_packet_count(self): 
+        def get_packet_count(self):
             if self._active: self._pkts += 50
             return self._pkts
     audiostream_core = type('MockModule', (object,), {'StreamController': MockStreamController})
@@ -42,7 +42,6 @@ class AudioStreamListener(ServiceListener):
     def add_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         info = zc.get_service_info(type_, name)
         if info:
-            # Resolve IPv4 address
             ip = None
             for addr in info.addresses:
                 try:
@@ -64,8 +63,14 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("AudioStream Controller")
-        self.setMinimumSize(480, 560)
-        self.resize(500, 600)
+        self.setMinimumSize(480, 620)
+        self.resize(500, 650)
+
+        # Set window icon (reuse the same branded icon)
+        import os
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "android_app", "assets", "icon.png")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
 
         # Initialize C++ StreamController
         self.controller = audiostream_core.StreamController()
@@ -90,7 +95,6 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.update_telemetry)
 
     def init_ui(self):
-        # Apply dark-mode theme stylesheet
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #121214;
@@ -150,7 +154,7 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(24, 24, 24, 24)
         main_layout.setSpacing(20)
 
-        # 1. Header Section
+        # ── 1. Header ────────────────────────────────────────────────────────
         header_layout = QVBoxLayout()
         title_label = QLabel("AudioStream")
         title_label.setStyleSheet("font-size: 26px; font-weight: bold; color: #FFFFFF;")
@@ -160,32 +164,36 @@ class MainWindow(QMainWindow):
         header_layout.addWidget(subtitle_label)
         main_layout.addLayout(header_layout)
 
-        # 2. Status Indicator Card
+        # ── 2. Status Card ───────────────────────────────────────────────────
         self.status_card = QFrame()
         self.status_card.setObjectName("card")
         status_layout = QHBoxLayout(self.status_card)
         status_layout.setContentsMargins(16, 16, 16, 16)
-        
+
         self.status_dot = QFrame()
         self.status_dot.setFixedSize(10, 10)
-        self.status_dot.setStyleSheet("background-color: #FF453A; border-radius: 5px;") # default red
-        
+        self.status_dot.setStyleSheet("background-color: #FF453A; border-radius: 5px;")
+
         self.status_text = QLabel("System Idle")
         self.status_text.setStyleSheet("font-size: 14px; font-weight: 500; color: #FF453A;")
-        
+
+        # Audio source info label (right-aligned)
+        self.source_label = QLabel("📡  Source: System Audio Monitor")
+        self.source_label.setStyleSheet("font-size: 11px; color: #636366;")
+
         status_layout.addWidget(self.status_dot)
         status_layout.addWidget(self.status_text)
         status_layout.addStretch()
+        status_layout.addWidget(self.source_label)
         main_layout.addWidget(self.status_card)
 
-        # 3. Connection Settings Card
+        # ── 3. Connection Settings Card ──────────────────────────────────────
         settings_card = QFrame()
         settings_card.setObjectName("card")
         settings_layout = QVBoxLayout(settings_card)
         settings_layout.setContentsMargins(16, 16, 16, 16)
         settings_layout.setSpacing(12)
 
-        # Discovered Devices list
         dev_label = QLabel("Auto-Discovered Devices (mDNS):")
         dev_label.setStyleSheet("font-weight: 600; color: #FFFFFF;")
         self.device_combo = QComboBox()
@@ -194,33 +202,28 @@ class MainWindow(QMainWindow):
         settings_layout.addWidget(dev_label)
         settings_layout.addWidget(self.device_combo)
 
-        # Divider
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
         divider.setStyleSheet("background-color: #2C2C2E; max-height: 1px; border: none;")
         settings_layout.addWidget(divider)
 
-        # Manual Settings
         manual_label = QLabel("Or Enter Connection Parameters Manually:")
         manual_label.setStyleSheet("font-weight: 600; color: #FFFFFF;")
         settings_layout.addWidget(manual_label)
 
         grid = QGridLayout()
         grid.setSpacing(10)
-
         grid.addWidget(QLabel("IP Address:"), 0, 0)
         self.ip_input = QLineEdit()
         self.ip_input.setPlaceholderText("e.g. 192.168.1.50")
         grid.addWidget(self.ip_input, 0, 1)
-
         grid.addWidget(QLabel("Port:"), 1, 0)
         self.port_input = QLineEdit("8554")
         grid.addWidget(self.port_input, 1, 1)
-
         settings_layout.addLayout(grid)
         main_layout.addWidget(settings_card)
 
-        # 4. Telemetry Card
+        # ── 4. Telemetry Card ────────────────────────────────────────────────
         self.telemetry_card = QFrame()
         self.telemetry_card.setObjectName("card")
         telemetry_layout = QGridLayout(self.telemetry_card)
@@ -238,9 +241,9 @@ class MainWindow(QMainWindow):
         telemetry_layout.addWidget(self.packets_val, 1, 1)
 
         main_layout.addWidget(self.telemetry_card)
-        self.telemetry_card.hide() # Hide until streaming starts
+        self.telemetry_card.hide()
 
-        # 5. Bottom Controls (Large Toggle Button)
+        # ── 5. Toggle Button ─────────────────────────────────────────────────
         self.toggle_button = QPushButton("Start Streaming")
         self.toggle_button.setObjectName("toggleBtn")
         self.toggle_button.clicked.connect(self.on_toggle_clicked)
@@ -248,13 +251,10 @@ class MainWindow(QMainWindow):
 
         main_layout.addStretch()
 
-    # mDNS Slots
+    # ── mDNS Slots ────────────────────────────────────────────────────────────
+
     def on_device_found(self, name, ip, port):
-        # Format service name for display (strip suffix)
-        display_name = name.split(".")[0]
         self.devices[name] = (ip, port)
-        
-        # Re-build dropdown items
         self.update_device_dropdown()
 
     def on_device_lost(self, name):
@@ -265,7 +265,6 @@ class MainWindow(QMainWindow):
     def update_device_dropdown(self):
         self.device_combo.blockSignals(True)
         self.device_combo.clear()
-        
         if not self.devices:
             self.device_combo.addItem("Searching for receivers on WiFi...")
             self.device_combo.setStyleSheet("color: #8E8E93;")
@@ -275,94 +274,90 @@ class MainWindow(QMainWindow):
             for name, (ip, port) in self.devices.items():
                 display_name = name.split(".")[0]
                 self.device_combo.addItem(f"{display_name} ({ip}:{port})", userData=name)
-        
         self.device_combo.blockSignals(False)
 
     def on_device_selection_changed(self, index):
         if index <= 0:
             return
-        
-        # Fill in manual input fields with selected device parameters
         name = self.device_combo.itemData(index)
         if name in self.devices:
             ip, port = self.devices[name]
             self.ip_input.setText(ip)
             self.port_input.setText(str(port))
 
-    # Control logic
+    # ── Control Logic ─────────────────────────────────────────────────────────
+
     def on_toggle_clicked(self):
         if self.controller.is_streaming():
-            # Stop streaming
-            self.controller.stop()
-            self.timer.stop()
-            
-            # Reset UI state
-            self.toggle_button.setText("Start Streaming")
-            self.toggle_button.setProperty("streaming", "false")
-            self.toggle_button.setStyle(self.toggle_button.style()) # force repaint
-            
-            self.status_dot.setStyleSheet("background-color: #FF453A; border-radius: 5px;")
-            self.status_text.setText("System Idle")
-            self.status_text.setStyleSheet("font-size: 14px; font-weight: 500; color: #FF453A;")
-            
-            self.telemetry_card.hide()
-            self.device_combo.setEnabled(True)
-            self.ip_input.setEnabled(True)
-            self.port_input.setEnabled(True)
+            self._stop_streaming()
         else:
-            # Gather targets
-            ip = self.ip_input.text().strip()
-            port_str = self.port_input.text().strip()
+            self._start_streaming()
 
-            if not ip:
-                self.status_text.setText("Error: IP required")
-                return
+    def _stop_streaming(self):
+        self.controller.stop()
+        self.timer.stop()
+        self.toggle_button.setText("Start Streaming")
+        self.toggle_button.setProperty("streaming", "false")
+        self.toggle_button.setStyle(self.toggle_button.style())
+        self.status_dot.setStyleSheet("background-color: #FF453A; border-radius: 5px;")
+        self.status_text.setText("System Idle")
+        self.status_text.setStyleSheet("font-size: 14px; font-weight: 500; color: #FF453A;")
+        self.telemetry_card.hide()
+        self.device_combo.setEnabled(True)
+        self.ip_input.setEnabled(True)
+        self.port_input.setEnabled(True)
 
-            try:
-                port = int(port_str)
-            except ValueError:
-                self.status_text.setText("Error: Invalid Port")
-                return
+    def _start_streaming(self):
+        ip = self.ip_input.text().strip()
+        port_str = self.port_input.text().strip()
 
-            # Start C++ streaming thread
-            if self.controller.start(ip, port):
-                self.timer.start(100) # update every 100ms
-                
-                # Update UI state
-                self.toggle_button.setText("Stop Streaming")
-                self.toggle_button.setProperty("streaming", "true")
-                self.toggle_button.setStyle(self.toggle_button.style()) # force repaint
-                
-                self.status_dot.setStyleSheet("background-color: #30D158; border-radius: 5px;")
-                self.status_text.setText(f"Streaming to {ip}:{port}")
-                self.status_text.setStyleSheet("font-size: 14px; font-weight: 500; color: #30D158;")
-                
-                self.latency_val.setText("0.0 ms")
-                self.packets_val.setText("0")
-                self.telemetry_card.show()
-                
-                self.device_combo.setEnabled(False)
-                self.ip_input.setEnabled(False)
-                self.port_input.setEnabled(False)
-            else:
-                self.status_text.setText("Error starting C++ engine")
+        if not ip:
+            QMessageBox.warning(self, "Connection Error",
+                                "Please enter a target IP address before starting.")
+            return
+
+        try:
+            port = int(port_str)
+            if not (1 <= port <= 65535):
+                raise ValueError
+        except ValueError:
+            QMessageBox.warning(self, "Connection Error",
+                                f"'{port_str}' is not a valid port number (1–65535).")
+            return
+
+        if self.controller.start(ip, port):
+            self.timer.start(100)
+            self.toggle_button.setText("Stop Streaming")
+            self.toggle_button.setProperty("streaming", "true")
+            self.toggle_button.setStyle(self.toggle_button.style())
+            self.status_dot.setStyleSheet("background-color: #30D158; border-radius: 5px;")
+            self.status_text.setText(f"Streaming → {ip}:{port}")
+            self.status_text.setStyleSheet("font-size: 14px; font-weight: 500; color: #30D158;")
+            self.latency_val.setText("0.0 ms")
+            self.packets_val.setText("0")
+            self.telemetry_card.show()
+            self.device_combo.setEnabled(False)
+            self.ip_input.setEnabled(False)
+            self.port_input.setEnabled(False)
+        else:
+            QMessageBox.critical(self, "Engine Error",
+                                 "Failed to start the C++ audio capture engine.\n\n"
+                                 "Ensure PulseAudio / PipeWire is running and a valid "
+                                 "audio output device is available.")
 
     def update_telemetry(self):
-        # Fetch directly from thread-safe C++ controller methods
         latency = self.controller.get_latency_ms()
         packets = self.controller.get_packet_count()
-
         self.latency_val.setText(f"{latency:.2f} ms")
         self.packets_val.setText(f"{packets:,}")
 
-        # Check if C++ engine thread unexpectedly stopped (e.g. driver failure)
+        # Detect unexpected engine stop (e.g. driver failure)
         if not self.controller.is_streaming():
-            self.on_toggle_clicked() # turn off
+            self._stop_streaming()
             self.status_text.setText("Stream stopped unexpectedly")
             self.status_text.setStyleSheet("font-size: 14px; font-weight: 500; color: #FF453A;")
 
     def closeEvent(self, event):
-        # Ensure thread cleanup and Zeroconf shutdown on application exit
         self.controller.stop()
         self.zeroconf.close()
         event.accept()

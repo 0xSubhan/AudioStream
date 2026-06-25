@@ -130,7 +130,20 @@ Based on 2-3 hours of focused daily development, the total project timeline is e
 * Successfully executed `./build/bin/test_capture` on Linux, validating PulseAudio monitor loopback capture and writing 5 seconds of captured system audio to a valid `.wav` file (`output_capture.wav`).
 * Successfully executed `./build/bin/test_opus` on Linux, validating the real-time Opus capture-encode-decode pipeline and writing a fully reconstructed `.wav` file (`output_opus.wav`).
 * Verified Python pybind11 import compatibility by successfully importing `audiostream_core` from within the virtual environment Python interpreter.
+### 2026-06-25 (Pre-Phase 9: Android Foreground Service for Background Audio)
+* Created `AudioReceiverService.kt` — a new Kotlin `Service` that owns the C++ engine lifecycle. On `ACTION_START`, it calls `ReceiverEngine.nativeStart()` and promotes itself to a Foreground Service via `startForeground()`, preventing the OS from killing it when the screen is off or the app is backgrounded.
+* The foreground notification (`"AudioStream Active"`) shows a persistent "Stop" action button. Tapping it sends `ACTION_STOP` to the service, which calls `nativeStop()`, removes the notification, and broadcasts `ENGINE_STOPPED` so the Flutter UI can sync its state.
+* Updated `AndroidManifest.xml` to declare `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK` permissions and register `AudioReceiverService` with `foregroundServiceType="mediaPlayback"`.
+* Refactored `MainActivity.kt` to delegate `startEngine`/`stopEngine` method-channel calls to the service instead of calling the native JNI directly. Removed `nativeStop()` from `onDestroy()` so the engine survives Activity destruction. Registered a `BroadcastReceiver` for `ENGINE_STOPPED` events, which invokes `onEngineStopped` on the Flutter method channel to sync the UI.
+* Updated `main.dart` to register a `setMethodCallHandler` listening for the `onEngineStopped` push event from native, updating `_isListening = false` and clearing telemetry. Removed the `stopEngine` call from `dispose()`. Updated hint text to reflect background operation.
 
-
-
-
+### 2026-06-25 (Phase 9: Polishing, Packaging & Beta Release)
+* **Android — App name**: Updated `android:label` in `AndroidManifest.xml` from package ID `audiostream_app` to the user-visible name `AudioStream`.
+* **Android — App icon**: Generated a branded 1024×1024 dark-themed icon (neon audio waveform, blue-to-green gradient). Used `flutter_launcher_icons` to slice it into all mipmap densities and generate an adaptive icon for Android 8.0+.
+* **Android — Splash screen**: Replaced the default white flash with a dark `#121214` background via `@color/splashBackground` in `colors.xml`, updating both launch_background drawables. Updated `styles.xml` (light and night) to use `Theme.Black.NoTitleBar`.
+* **Android — Version**: Bumped `pubspec.yaml` version from `1.0.0+1` → `1.0.0+2`.
+* **PC App — Error handling**: Replaced silent status-label errors with modal `QMessageBox` dialogs for missing IP and engine start failures.
+* **PC App — Audio source label**: Added a `"📡 Source: System Audio Monitor"` label in the status card.
+* **PC App — Window icon**: Set the PyQt6 window icon to the shared branded `assets/icon.png` via `QIcon`.
+* **PC App — Launcher**: Created `run_pc_app.sh` — one-shot bash launcher that auto-creates the Python venv, installs dependencies, and runs the app.
+* **Documentation**: Overhauled root `README.md` with full architecture diagram, prerequisites, build guide, usage instructions, feature table, and project structure.

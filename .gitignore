@@ -2,6 +2,11 @@
 # AudioStream .gitignore
 # ==============================================================================
 
+# 0. Android Signing (NEVER commit)
+android_app/android/key.properties
+android_app/android/app/*.jks
+android_app/android/app/*.keystore
+
 # 1. Build & Compilation Artifacts
 build/
 bin/
@@ -33,7 +38,19 @@ third_party/debs/
 *.wav
 output_capture.wav
 
-# 5. IDE & Editor Files
+# 5. Android & Flutter Build Artifacts
+android_app/build/
+android_app/.dart_tool/
+android_app/.flutter-plugins
+android_app/.flutter-plugins-dependencies
+android_app/android/.gradle/
+android_app/android/app/build/
+android_app/android/local.properties
+android_app/pubspec.lock
+*.apk
+*.aab
+
+# 6. IDE & Editor Files
 .vscode/
 .clangd
 .cache/

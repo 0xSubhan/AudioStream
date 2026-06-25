@@ -51,12 +51,32 @@ class _ReceiverDashboardState extends State<ReceiverDashboard> {
   void initState() {
     super.initState();
     _resolveIpAddress();
+    // Listen for native-side events (e.g. notification Stop button tapped)
+    _channel.setMethodCallHandler(_handleNativeCall);
+  }
+
+  /// Handles method calls pushed FROM native → Flutter.
+  Future<void> _handleNativeCall(MethodCall call) async {
+    if (call.method == 'onEngineStopped') {
+      // The user tapped Stop on the notification — sync the UI state.
+      _statsTimer?.cancel();
+      if (mounted) {
+        setState(() {
+          _isListening = false;
+          _packetCount = 0;
+          _underrunCount = 0;
+          _jitterMs = 0.0;
+          _targetDelayPackets = 0;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
     _statsTimer?.cancel();
-    _channel.invokeMethod('stopEngine');
+    // NOTE: Do NOT stop the engine here. The Foreground Service owns the
+    // engine lifecycle and keeps running even when this Activity is destroyed.
     super.dispose();
   }
 
@@ -365,7 +385,7 @@ class _ReceiverDashboardState extends State<ReceiverDashboard> {
               ),
             const SizedBox(height: 16),
             const Text(
-              'Listening on port 8554. Keep app open on WiFi so the PC application can automatically discover and connect to it.',
+              'Listening on port 8554. Audio streams in the background — use the notification to stop without opening the app.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
             ),

@@ -1,6 +1,9 @@
 package com.audiostream.audiostream_app
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.Build
@@ -11,35 +14,83 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.audiostream/receiver"
+
+    private var methodChannel: MethodChannel? = null
     private var nsdManager: NsdManager? = null
     private var registrationListener: NsdManager.RegistrationListener? = null
     private var serviceName: String = "AudioStream-${Build.MODEL}"
 
+    // ── BroadcastReceiver: listens for SERVICE → UI "engine stopped" events ──
+    private val engineStoppedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == AudioReceiverService.BROADCAST_ENGINE_STOPPED) {
+                // Tell Flutter the engine stopped externally (notification Stop button)
+                methodChannel?.invokeMethod("onEngineStopped", null)
+            }
+        }
+    }
+
+    // ── Activity lifecycle ────────────────────────────────────────────────────
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         registerMdnsService()
+
+        // Register broadcast receiver for when notification Stop is tapped
+        val filter = IntentFilter(AudioReceiverService.BROADCAST_ENGINE_STOPPED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(engineStoppedReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(engineStoppedReceiver, filter)
+        }
     }
+
+    override fun onDestroy() {
+        // Do NOT stop the engine here — the Service owns the engine lifecycle.
+        // The Foreground Service continues running even after the Activity is destroyed.
+        unregisterReceiver(engineStoppedReceiver)
+        unregisterMdnsService()
+        super.onDestroy()
+    }
+
+    // ── Flutter method channel ────────────────────────────────────────────────
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+
+        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+
+        methodChannel!!.setMethodCallHandler { call, result ->
             when (call.method) {
                 "startEngine" -> {
                     val port = call.argument<Int>("port") ?: 8554
-                    val success = ReceiverEngine.nativeStart(port)
-                    result.success(success)
+                    // Delegate to the foreground service — keeps running in background
+                    val serviceIntent = Intent(this, AudioReceiverService::class.java).apply {
+                        action = AudioReceiverService.ACTION_START
+                        putExtra(AudioReceiverService.EXTRA_PORT, port)
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(serviceIntent)
+                    } else {
+                        startService(serviceIntent)
+                    }
+                    result.success(true)
                 }
                 "stopEngine" -> {
-                    ReceiverEngine.nativeStop()
+                    // Tell the service to stop itself (calls nativeStop internally)
+                    val serviceIntent = Intent(this, AudioReceiverService::class.java).apply {
+                        action = AudioReceiverService.ACTION_STOP
+                    }
+                    startService(serviceIntent)
                     result.success(true)
                 }
                 "getStats" -> {
                     val stats = mapOf(
-                        "packetCount" to ReceiverEngine.nativeGetPacketCount(),
+                        "packetCount"   to ReceiverEngine.nativeGetPacketCount(),
                         "underrunCount" to ReceiverEngine.nativeGetUnderrunCount(),
-                        "jitterMs" to ReceiverEngine.nativeGetJitterMs(),
-                        "targetDelay" to ReceiverEngine.nativeGetTargetDelayPackets()
+                        "jitterMs"      to ReceiverEngine.nativeGetJitterMs(),
+                        "targetDelay"   to ReceiverEngine.nativeGetTargetDelayPackets()
                     )
                     result.success(stats)
                 }
@@ -48,9 +99,11 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    // ── mDNS registration ─────────────────────────────────────────────────────
+
     private fun registerMdnsService() {
         nsdManager = getSystemService(Context.NSD_SERVICE) as NsdManager
-        
+
         val serviceInfo = NsdServiceInfo().apply {
             serviceType = "_audiostream._udp."
             serviceName = this@MainActivity.serviceName
@@ -59,10 +112,8 @@ class MainActivity : FlutterActivity() {
 
         registrationListener = object : NsdManager.RegistrationListener {
             override fun onServiceRegistered(info: NsdServiceInfo) {
-                // Store the actual registered name (handles namespace conflicts)
                 this@MainActivity.serviceName = info.serviceName
             }
-
             override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {}
             override fun onServiceUnregistered(info: NsdServiceInfo) {}
             override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) {}
@@ -83,11 +134,5 @@ class MainActivity : FlutterActivity() {
                 // Ignore if not registered or already closed
             }
         }
-    }
-
-    override fun onDestroy() {
-        ReceiverEngine.nativeStop()
-        unregisterMdnsService()
-        super.onDestroy()
     }
 }

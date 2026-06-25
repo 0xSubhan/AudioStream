@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🎵 AudioStream
+<img src="android_app/assets/icon.png" alt="AudioStream Logo" width="120"/>
+
+# AudioStream
 
 **Real-time, low-latency WiFi audio streaming from your PC to Android.**
 

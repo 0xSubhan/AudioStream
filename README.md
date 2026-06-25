@@ -51,12 +51,9 @@ AudioStream captures your system audio on Linux/Windows, compresses it with Opus
 
 ## Prerequisites
 
-### PC (Linux)
-- Python 3.10+
-- PulseAudio or PipeWire (pre-installed on Ubuntu 22.04+)
-- CMake 3.22+, GCC/Clang with C++17 support
-- `libpulse-dev`, `libopus-dev` (or use the local `third_party/extracted` copies)
-- PyQt6: `pip install PyQt6`
+### PC (Linux) — for end users
+- PulseAudio or PipeWire — pre-installed on Ubuntu 20.04+, Fedora, Arch, etc.
+- That's it. **No Python, no cmake, no build tools needed.**
 
 ### Android
 - Android 8.0+ (API 26+, `minSdk = 26`)
@@ -64,55 +61,70 @@ AudioStream captures your system audio on Linux/Windows, compresses it with Opus
 
 ---
 
-## Build & Run
+## Getting Started
 
-### 1. Build the C++ PC engine
+### PC Broadcaster (Linux)
+
+**Option A — Pre-built binary (recommended, zero dependencies)**
+
+1. Download `AudioStream` from the [**Releases page**](../../releases/latest).
+2. Make it executable and run:
 
 ```bash
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc)
+chmod +x AudioStream
+./AudioStream
 ```
 
-The Python module `audiostream_core.*.so` will be output to `pc_app/`.
+No Python, no cmake, no pip — the binary is fully self-contained.
 
-### 2. Start the PC broadcaster
+**Option B — Run from source**
+
+Requires Python 3.10+ and a pre-built `audiostream_core*.so` (see [Developer Build](#developer-build) below).
 
 ```bash
 ./run_pc_app.sh
 ```
 
-This script automatically creates the Python venv if missing, installs dependencies, and launches the GUI. You can also run it directly:
+This script creates a venv, installs Python dependencies, and launches the GUI automatically.
 
-```bash
-source venv/bin/activate
-cd pc_app && python app.py
-```
+---
 
-### 3. Install the Android APK
+### Android App
 
-Build the release APK:
+Install the APK from the [**Releases page**](../../releases/latest), or build it yourself:
+
 ```bash
 cd android_app
 flutter build apk --release
-```
-
-Install via ADB:
-```bash
 adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
-### 4. Stream audio
+---
+
+### Streaming
 
 1. Open **AudioStream** on your Android phone and tap **START RECEIVER**.  
    A notification appears: *"AudioStream Active — Receiving audio from PC…"*  
    The receiver keeps running even with the screen off.
 
-2. On your PC, open the AudioStream Controller app. Your Android device will appear automatically in the **Auto-Discovered Devices** dropdown.
+2. On your PC, open the AudioStream Controller. Your Android device appears automatically in the **Auto-Discovered Devices** dropdown (mDNS).
 
-3. Select your device and click **Start Streaming**. Audio from your PC speakers/headphones streams to your phone instantly.
+3. Select your device and click **Start Streaming**. Audio streams to your phone instantly.
 
-4. To stop: tap **Stop Streaming** in the PC app, or tap **Stop** on the Android notification.
+4. To stop: click **Stop Streaming** in the PC app, or tap **Stop** in the Android notification.
+
+---
+
+## Developer Build
+
+To build the single-binary release yourself (requires `cmake`, `gcc`, `libpulse-dev`, `libopus-dev`):
+
+```bash
+chmod +x build_release.sh
+./build_release.sh
+```
+
+This compiles the C++ engine, bundles Python + all dependencies via PyInstaller, and outputs a self-contained `dist/AudioStream` binary ready to upload to GitHub Releases.
 
 ---
 

@@ -67,8 +67,13 @@ class MainWindow(QMainWindow):
         self.resize(500, 650)
 
         # Set window icon (reuse the same branded icon)
-        import os
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "android_app", "assets", "icon.png")
+        import os, sys
+        # When bundled by PyInstaller, assets are extracted to sys._MEIPASS/assets/
+        _base = getattr(sys, '_MEIPASS', None) or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+        icon_path = os.path.join(_base, "assets", "icon.png")
+        # Fallback: original source-tree location
+        if not os.path.exists(icon_path):
+            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "android_app", "assets", "icon.png")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 

@@ -26,6 +26,29 @@ AudioStream captures your system audio on Linux/Windows, compresses it with Opus
 
 ---
 
+## Screenshots
+
+<table>
+  <tr>
+    <th align="center">Android — Idle</th>
+    <th align="center">Android — Receiving</th>
+    <th align="center">PC Controller</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/android_receiver_idle.png" width="200" alt="Android app idle state"/>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/android_receiver_active.png" width="200" alt="Android app active state with telemetry"/>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/pc_controller.png" width="300" alt="PC broadcaster controller UI"/>
+    </td>
+  </tr>
+</table>
+
+---
+
 ## Prerequisites
 
 ### PC (Linux)

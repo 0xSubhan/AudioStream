@@ -47,9 +47,16 @@ if(PYBIND11_CMAKE_DIR)
     pybind11_add_module(audiostream_pybindings core/src/bindings.cpp)
     target_link_libraries(audiostream_pybindings PRIVATE audiostream_core)
 
-    # Place the compiled shared library directly in the pc_app/ directory and rename binary to audiostream_core
+    # Place the .so/.pyd directly in pc_app/ on all platforms and configs.
+    # On Windows MSVC (multi-config generator), CMake appends /Release/ to
+    # LIBRARY_OUTPUT_DIRECTORY unless the per-config variants are also set.
     set_target_properties(audiostream_pybindings PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/pc_app"
+        LIBRARY_OUTPUT_DIRECTORY         "${CMAKE_SOURCE_DIR}/pc_app"
+        LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/pc_app"
+        LIBRARY_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_SOURCE_DIR}/pc_app"
+        RUNTIME_OUTPUT_DIRECTORY         "${CMAKE_SOURCE_DIR}/pc_app"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/pc_app"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_SOURCE_DIR}/pc_app"
         OUTPUT_NAME "audiostream_core"
     )
 else()

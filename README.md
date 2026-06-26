@@ -18,9 +18,9 @@
 
 <br/>
 
-[**Download for Linux**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
-[**Download for Windows**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
-[**Get the Android APK**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
+[**⬇ Download for Linux**](https://github.com/0xSubhan/AudioStream/releases/latest/download/AudioStream) &nbsp;·&nbsp;
+[**⬇ Download for Windows**](https://github.com/0xSubhan/AudioStream/releases/latest/download/AudioStream.exe) &nbsp;·&nbsp;
+[**⬇ Get the Android APK**](https://github.com/0xSubhan/AudioStream/releases/latest/download/app-release.apk) &nbsp;·&nbsp;
 [**How It Works**](#-how-it-works) &nbsp;·&nbsp;
 [**Contributing**](#-contributing)
 

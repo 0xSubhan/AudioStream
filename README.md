@@ -18,10 +18,10 @@
 
 <br/>
 
-[** Download for Linux**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
-[** Get the Android APK**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
-[** How It Works**](#-how-it-works) &nbsp;·&nbsp;
-[** Contributing**](#-contributing)
+[**Download for Linux**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
+[**Get the Android APK**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
+[**How It Works**](#-how-it-works) &nbsp;·&nbsp;
+[**Contributing**](#-contributing)
 
 </div>
 

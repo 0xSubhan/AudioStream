@@ -16,34 +16,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Set up Python ─────────────────────────────────────────
+      # ── 2. Set up Python 3.12 ────────────────────────────────────
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # ── 3. Install Python dependencies (includes pybind11) ───────
-      #    Must happen BEFORE cmake configure so pybind11 is findable
+      # ── 3. Install Python packages (pybind11 BEFORE cmake) ───────
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install pybind11 pyinstaller pillow
           pip install -r pc_app/requirements.txt
-          pip install pyinstaller pillow pybind11
-        shell: pwsh
 
       # ── 4. Install Opus via vcpkg ─────────────────────────────────
-      #    windows-latest has vcpkg pre-installed at C:\vcpkg
-      - name: Install Opus (vcpkg)
+      #    On windows-latest, vcpkg is pre-installed and on PATH
+      - name: Install Opus via vcpkg
         run: vcpkg install opus:x64-windows
         shell: pwsh
 
       # ── 5. Configure CMake ────────────────────────────────────────
       - name: Configure CMake
         run: |
+          $pyexe = (Get-Command python).Source
           cmake -B build `
             -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DPython3_EXECUTABLE="$pyexe" `
             -A x64
         shell: pwsh
 
@@ -63,13 +63,13 @@ jobs:
           Write-Host "Found: $($pyd.FullName)"
         shell: pwsh
 
-      # ── 8. Convert icon PNG → ICO ─────────────────────────────────
+      # ── 8. Convert icon PNG → ICO (non-fatal) ────────────────────
       - name: Generate Windows icon
         run: |
           New-Item -ItemType Directory -Path assets -Force | Out-Null
           python -c "from PIL import Image; img=Image.open('android_app/assets/icon.png'); img.save('assets/icon.ico', format='ICO', sizes=[(256,256),(128,128),(64,64),(32,32),(16,16)]); print('icon.ico OK')"
         shell: pwsh
-        continue-on-error: true   # Non-fatal: .exe still works without a custom icon
+        continue-on-error: true
 
       # ── 9. Bundle with PyInstaller ────────────────────────────────
       - name: Bundle AudioStream.exe with PyInstaller
@@ -92,7 +92,7 @@ jobs:
           Write-Host ("AudioStream.exe: {0:N1} MB" -f $size)
         shell: pwsh
 
-      # ── 11. Upload as workflow artifact ───────────────────────────
+      # ── 11. Upload artifact ───────────────────────────────────────
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

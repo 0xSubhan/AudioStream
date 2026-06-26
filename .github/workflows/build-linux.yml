@@ -16,33 +16,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Install system dependencies ───────────────────────────
+      # ── 2. Set up Python 3.12 first (must be before system deps) ─
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ── 3. Install system dependencies ───────────────────────────
+      #    Note: NO python3-dev here — we use the Python from setup-python above.
+      #    The actions/setup-python runner already provides the dev headers.
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             cmake gcc g++ \
             libpulse-dev libopus-dev \
-            python3-dev \
             upx-ucl
 
-      # ── 3. Set up Python ─────────────────────────────────────────
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      # ── 4. Install Python dependencies (includes pybind11) ───────
-      #    Must happen BEFORE cmake configure so pybind11 is findable
+      # ── 4. Install Python packages (pybind11 BEFORE cmake) ───────
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install pybind11 pyinstaller
           pip install -r pc_app/requirements.txt
-          pip install pyinstaller pybind11
 
       # ── 5. Configure CMake ────────────────────────────────────────
+      #    Point CMake at the Python from setup-python, not system Python
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=OFF
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=OFF \
+            -DPython3_EXECUTABLE=$(which python)
 
       # ── 6. Build C++ engine ───────────────────────────────────────
       - name: Build C++ engine

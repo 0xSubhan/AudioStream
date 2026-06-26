@@ -1,5 +1,12 @@
 #include "../include/stream_controller.h"
-#include "../include/pulse_capture.h"
+
+// Platform-specific audio capture backend
+#ifdef _WIN32
+  #include "../include/wasapi_capture.h"
+#else
+  #include "../include/pulse_capture.h"
+#endif
+
 #include "../include/opus_encoder.h"
 #include "../include/udp_sender.h"
 #include "../include/rtp_packet.h"
@@ -62,8 +69,12 @@ int StreamController::getPacketCount() const {
 void StreamController::streamLoop(const std::string ip, int port) {
     std::cout << "[StreamController] Streaming thread started." << std::endl;
 
-    // 1. Initialize PulseAudio capture (48kHz, Stereo)
+    // 1. Initialize platform-specific audio capture (48kHz, Stereo)
+#ifdef _WIN32
+    WasapiCapture capture(48000, 2);
+#else
     PulseAudioCapture capture(48000, 2);
+#endif
     if (!capture.start()) {
         std::cerr << "[StreamController] Failed to start capture." << std::endl;
         running_ = false;

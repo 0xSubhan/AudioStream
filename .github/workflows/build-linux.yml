@@ -1,0 +1,109 @@
+name: Build Linux Binary
+
+# ─────────────────────────────────────────────────────────────────
+# Triggers:
+#   • Any tag pushed as "v*.*.*"  (e.g. v1.0.0) → uploads binary
+#     to the GitHub Release created for that tag.
+#   • Manual trigger from the Actions tab.
+# ─────────────────────────────────────────────────────────────────
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: Build AudioStream (Linux x64)
+    runs-on: ubuntu-22.04
+
+    steps:
+      # ── 1. Checkout ─────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ── 2. Install system dependencies ──────────────────────────
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            gcc \
+            g++ \
+            libpulse-dev \
+            libopus-dev \
+            python3 \
+            python3-venv \
+            python3-pip \
+            upx-ucl
+
+      # ── 3. Set up Python ────────────────────────────────────────
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ── 4. Install Python dependencies ──────────────────────────
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r pc_app/requirements.txt
+          pip install pyinstaller
+
+      # ── 5. Configure CMake ───────────────────────────────────────
+      - name: Configure CMake (Release)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=OFF
+
+      # ── 6. Build C++ engine ──────────────────────────────────────
+      - name: Build C++ engine (PulseAudio + pybind11)
+        run: cmake --build build --config Release --parallel $(nproc)
+
+      # ── 7. Verify .so was produced ───────────────────────────────
+      - name: Verify audiostream_core.so
+        run: |
+          SO=$(ls pc_app/audiostream_core*.so 2>/dev/null | head -1)
+          if [ -z "$SO" ]; then
+            echo "ERROR: audiostream_core*.so not found in pc_app/"
+            exit 1
+          fi
+          echo "Found: $SO"
+
+      # ── 8. Bundle with PyInstaller ──────────────────────────────
+      - name: Bundle AudioStream binary with PyInstaller
+        run: |
+          cd pc_app
+          pyinstaller AudioStream.spec \
+            --distpath ../dist \
+            --workpath ../build/pyinstaller_work \
+            --noconfirm
+
+      # ── 9. Verify binary ─────────────────────────────────────────
+      - name: Verify binary
+        run: |
+          BINARY="dist/AudioStream"
+          if [ ! -f "$BINARY" ]; then
+            echo "ERROR: AudioStream binary not found."
+            exit 1
+          fi
+          chmod +x "$BINARY"
+          SIZE=$(du -sh "$BINARY" | cut -f1)
+          echo "AudioStream binary size: $SIZE"
+
+      # ── 10. Upload artifact ──────────────────────────────────────
+      - name: Upload AudioStream as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AudioStream-Linux-x64
+          path: dist/AudioStream
+          retention-days: 30
+
+      # ── 11. Attach to GitHub Release ─────────────────────────────
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/AudioStream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

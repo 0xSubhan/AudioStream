@@ -1,7 +1,17 @@
 #pragma once
 
 #include <string>
-#include <netinet/in.h>
+#include <cstdint>
+
+// Cross-platform socket address type
+#ifdef _WIN32
+  #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+  #endif
+  #include <winsock2.h>  // provides struct sockaddr_in on Windows
+#else
+  #include <netinet/in.h>
+#endif
 
 namespace audiostream {
 

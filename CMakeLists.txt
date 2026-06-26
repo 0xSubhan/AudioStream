@@ -11,20 +11,21 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Include core library
 add_subdirectory(core)
 
-# Add the test application for capturing system audio
-add_executable(test_capture tests/test_capture.cpp)
-add_executable(test_opus tests/test_opus.cpp)
-add_executable(test_sender tests/test_sender.cpp)
+# Test applications are Linux-only (they directly use PulseAudio)
+# On Windows the C++ engine is validated indirectly through the Python bindings
+if(NOT WIN32)
+    add_executable(test_capture tests/test_capture.cpp)
+    add_executable(test_opus    tests/test_opus.cpp)
+    add_executable(test_sender  tests/test_sender.cpp)
 
-# Link the test applications with the audiostream_core library
-target_link_libraries(test_capture PRIVATE audiostream_core)
-target_link_libraries(test_opus PRIVATE audiostream_core)
-target_link_libraries(test_sender PRIVATE audiostream_core)
+    target_link_libraries(test_capture PRIVATE audiostream_core)
+    target_link_libraries(test_opus    PRIVATE audiostream_core)
+    target_link_libraries(test_sender  PRIVATE audiostream_core)
 
-# Set output directory for executables
-set_target_properties(test_capture test_opus test_sender PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
+    set_target_properties(test_capture test_opus test_sender PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    )
+endif()
 
 # ----------------------------------------------------
 # Python Bindings (Phase 4)

@@ -1,0 +1,151 @@
+name: Build Windows EXE
+
+# ─────────────────────────────────────────────────────────────────
+# Triggers:
+#   • Any tag pushed as "v*.*.*"  (e.g. v1.0.0) → uploads .exe to
+#     the GitHub Release that was created for that tag.
+#   • Manual trigger from the Actions tab (workflow_dispatch).
+# ─────────────────────────────────────────────────────────────────
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build AudioStream.exe (Windows x64)
+    runs-on: windows-latest
+
+    steps:
+      # ── 1. Checkout ─────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ── 2. Set up Python ────────────────────────────────────────
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ── 3. Cache vcpkg packages ──────────────────────────────────
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\vcpkg\installed
+            C:\vcpkg\packages
+          key: vcpkg-opus-x64-windows-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            vcpkg-opus-x64-windows-${{ runner.os }}-
+
+      # ── 4. Install Opus via vcpkg ────────────────────────────────
+      - name: Install Opus (vcpkg)
+        run: |
+          # GitHub Actions windows-latest ships vcpkg at C:\vcpkg
+          C:\vcpkg\vcpkg.exe install opus:x64-windows
+          C:\vcpkg\vcpkg.exe integrate install
+        shell: cmd
+
+      # ── 5. Configure CMake ───────────────────────────────────────
+      - name: Configure CMake (Release, x64, vcpkg toolchain)
+        run: |
+          cmake -B build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -A x64
+        shell: pwsh
+
+      # ── 6. Build C++ engine ──────────────────────────────────────
+      - name: Build C++ engine (WASAPI + pybind11)
+        run: cmake --build build --config Release --parallel
+        shell: pwsh
+
+      # ── 7. Verify .pyd was produced ─────────────────────────────
+      - name: Verify audiostream_core.pyd
+        run: |
+          $pyd = Get-ChildItem -Path pc_app -Filter "audiostream_core*.pyd" | Select-Object -First 1
+          if (-not $pyd) {
+            Write-Error "audiostream_core*.pyd not found in pc_app\ — build may have failed."
+            exit 1
+          }
+          Write-Host "Found: $($pyd.FullName)"
+        shell: pwsh
+
+      # ── 8. Install Python dependencies ──────────────────────────
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r pc_app/requirements.txt
+          pip install pyinstaller pillow
+        shell: pwsh
+
+      # ── 9. Convert PNG icon → ICO ────────────────────────────────
+      - name: Generate Windows icon (icon.ico)
+        run: |
+          New-Item -ItemType Directory -Path assets -Force | Out-Null
+          python -c "
+          from PIL import Image
+          img = Image.open('android_app/assets/icon.png')
+          img.save('assets/icon.ico', format='ICO',
+                   sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)])
+          print('icon.ico generated successfully.')
+          "
+        shell: pwsh
+
+      # ── 10. Bundle with PyInstaller ──────────────────────────────
+      - name: Bundle AudioStream.exe with PyInstaller
+        run: |
+          Set-Location pc_app
+          pyinstaller AudioStream.spec `
+            --distpath ..\dist `
+            --workpath ..\build\pyinstaller_work `
+            --noconfirm
+        shell: pwsh
+
+      # ── 11. Verify .exe was produced ────────────────────────────
+      - name: Verify AudioStream.exe
+        run: |
+          $exe = "dist\AudioStream.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Error "AudioStream.exe not found — PyInstaller may have failed."
+            exit 1
+          }
+          $size = (Get-Item $exe).Length / 1MB
+          Write-Host ("AudioStream.exe size: {0:N1} MB" -f $size)
+        shell: pwsh
+
+      # ── 12. Upload artifact (always available for download) ──────
+      - name: Upload AudioStream.exe as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AudioStream-Windows-x64
+          path: dist/AudioStream.exe
+          retention-days: 30
+
+      # ── 13. Attach to GitHub Release (tag builds only) ──────────
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/AudioStream.exe
+          name: "AudioStream ${{ github.ref_name }}"
+          body: |
+            ## AudioStream ${{ github.ref_name }}
+
+            ### Downloads
+            | Platform | File | Notes |
+            |----------|------|-------|
+            | 🪟 Windows 10/11 (x64) | `AudioStream.exe` | Double-click to run — no install needed |
+            | 🐧 Linux (x64) | `AudioStream` | `chmod +x AudioStream && ./AudioStream` |
+            | 📱 Android 8.0+ | `app-release.apk` | Enable "Install unknown apps" first |
+
+            > **Windows SmartScreen**: If Windows shows an "Unknown publisher" warning, click **More info → Run anyway**.
+
+            ### What's new
+            See [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/docs/design_log.md) for details.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

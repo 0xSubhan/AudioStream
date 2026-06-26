@@ -1,4 +1,6 @@
 import sys
+import os
+import platform
 import socket
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -183,7 +185,8 @@ class MainWindow(QMainWindow):
         self.status_text.setStyleSheet("font-size: 14px; font-weight: 500; color: #FF453A;")
 
         # Audio source info label (right-aligned)
-        self.source_label = QLabel("📡  Source: System Audio Monitor")
+        _src = "System Audio (WASAPI)" if platform.system() == "Windows" else "System Audio Monitor"
+        self.source_label = QLabel(f"📡  Source: {_src}")
         self.source_label.setStyleSheet("font-size: 11px; color: #636366;")
 
         status_layout.addWidget(self.status_dot)
@@ -345,10 +348,16 @@ class MainWindow(QMainWindow):
             self.ip_input.setEnabled(False)
             self.port_input.setEnabled(False)
         else:
-            QMessageBox.critical(self, "Engine Error",
-                                 "Failed to start the C++ audio capture engine.\n\n"
-                                 "Ensure PulseAudio / PipeWire is running and a valid "
-                                 "audio output device is available.")
+            if platform.system() == "Windows":
+                _msg = ("Failed to start the audio engine.\n\n"
+                        "Ensure your audio output device is active and "
+                        "WASAPI loopback capture is available (Windows Vista+).")
+            else:
+                _msg = ("Failed to start the C++ audio capture engine.\n\n"
+                        "Ensure PulseAudio / PipeWire is running and a valid "
+                        "audio output device is available.")
+            QMessageBox.critical(self, "Engine Error", _msg)
+
 
     def update_telemetry(self):
         latency = self.controller.get_latency_ms()

@@ -9,7 +9,7 @@
 *Stream your desktop audio to any Android device on your local network — wirelessly, instantly, with no cables and no cloud.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Linux-informational?style=flat-square&logo=linux&logoColor=white)](https://github.com/0xSubhan/AudioStream/releases)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-informational?style=flat-square&logo=linux&logoColor=white)](https://github.com/0xSubhan/AudioStream/releases)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-brightgreen?style=flat-square&logo=android&logoColor=white)](https://github.com/0xSubhan/AudioStream/releases)
 [![C++](https://img.shields.io/badge/C++-17-blue?style=flat-square&logo=cplusplus&logoColor=white)](core/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-yellow?style=flat-square&logo=python&logoColor=white)](pc_app/)
@@ -19,6 +19,7 @@
 <br/>
 
 [**Download for Linux**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
+[**Download for Windows**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
 [**Get the Android APK**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
 [**How It Works**](#-how-it-works) &nbsp;·&nbsp;
 [**Contributing**](#-contributing)
@@ -137,15 +138,15 @@
 
 ### Tech Stack
 
-| Layer | PC Side | Android Side |
-|---|---|---|
-| **UI** | Python 3 + PyQt6 | Flutter (Dart) |
-| **Audio Capture/Playback** | PulseAudio / PipeWire | AAudio (NDK) |
-| **Codec** | Opus (C++ via libopus) | Opus (C++ via libopus) |
-| **Transport** | RTP/UDP (custom C++) | RTP/UDP (custom C++) |
-| **Discovery** | mDNS via Zeroconf | mDNS via NsdManager |
-| **JNI Bridge** | pybind11 | Kotlin JNI |
-| **Build** | CMake 3.22+ | Gradle + CMake |
+| Layer | PC Side (Linux) | PC Side (Windows) | Android Side |
+|---|---|---|---|
+| **UI** | Python 3 + PyQt6 | Python 3 + PyQt6 | Flutter (Dart) |
+| **Audio Capture** | PulseAudio / PipeWire | WASAPI loopback | AAudio (NDK) |
+| **Codec** | Opus (C++ via libopus) | Opus (C++ via libopus) | Opus (C++ via libopus) |
+| **Transport** | RTP/UDP (custom C++) | RTP/UDP (custom C++) | RTP/UDP (custom C++) |
+| **Discovery** | mDNS via Zeroconf | mDNS via Zeroconf | mDNS via NsdManager |
+| **JNI Bridge** | pybind11 | pybind11 | Kotlin JNI |
+| **Build** | CMake 3.22+ | CMake + MSVC/MinGW | Gradle + CMake |
 
 ---
 
@@ -223,6 +224,36 @@ The stream runs in its own high-priority real-time thread to prevent glitches fr
 
 ## Getting Started
 
+### For End Users (Windows PC)
+
+> No Python, cmake, or build tools required.
+
+**Step 1 — Download the PC app**
+
+Go to the [**Releases page**](https://github.com/0xSubhan/AudioStream/releases/latest) and download `AudioStream.exe`.
+
+Double-click `AudioStream.exe` to run — no installation needed.
+
+> **Note:** Windows may show a SmartScreen warning the first time ("Unknown publisher"). Click **More info → Run anyway** to proceed.
+
+**Step 2 — Install the Android APK**
+
+Download `app-release.apk` from the same releases page.
+
+- Enable **"Install unknown apps"** in your Android settings
+- Open the APK file on your phone to install it
+
+**Step 3 — Stream!**
+
+1. Open **AudioStream** on your Android phone → tap **START RECEIVER**
+2. Open **AudioStream.exe** on your Windows PC
+3. Your phone appears automatically in the dropdown — select it and click **Start Streaming**
+4. Audio from your PC streams to your phone instantly
+
+> Both devices must be on the **same WiFi network**.
+
+---
+
 ### For End Users (Linux PC)
 
 > No Python, cmake, or build tools required.
@@ -258,6 +289,7 @@ Download `app-release.apk` from the same releases page.
 
 #### Prerequisites
 
+**Linux:**
 ```
 cmake >= 3.22        GCC/Clang (C++17)     Python 3.10+
 libpulse-dev         libopus-dev            Flutter 3.x
@@ -268,7 +300,27 @@ Install system dependencies (Ubuntu/Debian):
 sudo apt install cmake gcc libpulse-dev libopus-dev python3-venv
 ```
 
-#### One-command build
+**Windows:**
+```
+CMake 3.22+          Visual Studio 2022 Build Tools (C++ workload)
+Python 3.10+         vcpkg (for Opus)        Flutter 3.x
+```
+
+Install Windows prerequisites:
+```powershell
+# 1. Install vcpkg (if not already)
+git clone https://github.com/microsoft/vcpkg C:\vcpkg
+C:\vcpkg\bootstrap-vcpkg.bat
+C:\vcpkg\vcpkg integrate install
+
+# 2. Install Opus via vcpkg
+C:\vcpkg\vcpkg install opus:x64-windows
+
+# 3. Set environment variable for the build script
+[System.Environment]::SetEnvironmentVariable('VCPKG_ROOT','C:\vcpkg','User')
+```
+
+#### One-command build (Linux)
 
 ```bash
 git clone https://github.com/0xSubhan/AudioStream.git
@@ -279,7 +331,17 @@ chmod +x build_release.sh
 
 This compiles the C++ engine, sets up a Python venv, installs all dependencies, and bundles everything into `dist/AudioStream` via PyInstaller.
 
-#### Or run from source
+#### One-command build (Windows)
+
+```bat
+git clone https://github.com/0xSubhan/AudioStream.git
+cd AudioStream
+build_release_windows.bat
+```
+
+This compiles the C++ WASAPI engine, sets up a Python venv, and bundles everything into `dist\AudioStream.exe` via PyInstaller.
+
+#### Or run from source (Linux)
 
 ```bash
 # 1. Build the C++ engine
@@ -311,18 +373,20 @@ AudioStream/
 ├── core/                          # C++ audio engine (shared logic)
 │   ├── include/
 │   │   ├── capture.h              # Abstract audio capture interface
-│   │   ├── pulse_capture.h        # PulseAudio monitor source capture
+│   │   ├── pulse_capture.h        # PulseAudio capture (Linux)
+│   │   ├── wasapi_capture.h       # WASAPI loopback capture (Windows)
 │   │   ├── opus_encoder.h         # Opus encoder wrapper
 │   │   ├── opus_decoder.h         # Opus decoder wrapper
 │   │   ├── rtp_packet.h           # RTP packet serialization (RFC 3550)
-│   │   ├── udp_sender.h           # Non-blocking UDP socket sender
+│   │   ├── udp_sender.h           # Cross-platform UDP socket sender
 │   │   └── stream_controller.h   # Top-level streaming orchestrator
 │   └── src/
-│       ├── pulse_capture.cpp
+│       ├── pulse_capture.cpp      # Linux PulseAudio implementation
+│       ├── wasapi_capture.cpp     # Windows WASAPI implementation
 │       ├── opus_encoder.cpp
 │       ├── opus_decoder.cpp
-│       ├── udp_sender.cpp
-│       ├── stream_controller.cpp
+│       ├── udp_sender.cpp         # Cross-platform (Winsock2 / POSIX)
+│       ├── stream_controller.cpp  # Selects capture backend via #ifdef
 │       └── bindings.cpp           # pybind11 Python bindings
 │
 ├── pc_app/                        # Python PC broadcaster UI
@@ -350,9 +414,10 @@ AudioStream/
 │   ├── design_log.md              # Architecture decisions & changelog
 │   └── screenshots/
 │
-├── build_release.sh               # One-shot release builder (dev use)
-├── run_pc_app.sh                  # Quick source-run launcher
-└── CMakeLists.txt                 # Root CMake build file
+├── build_release.sh               # One-shot Linux release builder
+├── build_release_windows.bat      # One-shot Windows release builder
+├── run_pc_app.sh                  # Quick source-run launcher (Linux)
+└── CMakeLists.txt                 # Root CMake build file (cross-platform)
 ```
 
 ---
@@ -369,7 +434,7 @@ AudioStream/
 | ✅ | Android Foreground Service (screen-off streaming) |
 | ✅ | Real-time telemetry (latency, jitter, packet count) |
 | ✅ | Self-contained PC binary (PyInstaller — no install needed) |
-| 🔲 | Windows PC broadcaster (WASAPI) |
+| ✅ | Windows PC broadcaster (WASAPI loopback) |
 | 🔲 | macOS PC broadcaster (CoreAudio) |
 | 🔲 | FEC (Forward Error Correction) for lossy networks |
 | 🔲 | Volume control in PC app |
@@ -392,7 +457,6 @@ Contributions are welcome! Here's how to get started:
 5. **Open a Pull Request** — describe what you changed and why
 
 ### Areas that need help
-- **Windows support** — WASAPI audio capture backend
 - **macOS support** — CoreAudio backend
 - **More tests** — especially network/jitter simulation
 - **Documentation** — architecture deep-dives, API docs

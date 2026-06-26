@@ -18,16 +18,16 @@
 
 <br/>
 
-[**⬇️ Download for Linux**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
-[**📱 Get the Android APK**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
-[**📖 How It Works**](#-how-it-works) &nbsp;·&nbsp;
-[**🤝 Contributing**](#-contributing)
+[** Download for Linux**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
+[** Get the Android APK**](https://github.com/0xSubhan/AudioStream/releases/latest) &nbsp;·&nbsp;
+[** How It Works**](#-how-it-works) &nbsp;·&nbsp;
+[** Contributing**](#-contributing)
 
 </div>
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 <table>
   <tr>
@@ -50,13 +50,13 @@
 
 ---
 
-## ✨ Features
+## Features
 
 <table>
   <tr>
     <td width="50%">
 
-### 🚀 Performance First
+### Performance First
 - **Sub-40ms end-to-end latency** target
 - **Opus codec** — same tech used by Discord & Zoom
 - **20ms audio frames** with VBR low-latency mode
@@ -65,7 +65,7 @@
   </td>
   <td width="50%">
 
-### 🔧 Just Works
+### Just Works
 - **mDNS auto-discovery** — no IP address entry needed
 - **Zero dependencies** for end users (self-contained binary)
 - **Android Foreground Service** — keeps streaming with screen off
@@ -76,7 +76,7 @@
   <tr>
     <td width="50%">
 
-### 📊 Adaptive Intelligence
+### Adaptive Intelligence
 - **RFC 3550-compliant** adaptive jitter buffer
 - **Dynamic buffer scaling** from 40ms → 160ms
 - **Drift correction** prevents audio desync over time
@@ -85,7 +85,7 @@
   </td>
   <td width="50%">
 
-### 🔊 Premium Audio Quality
+### Premium Audio Quality
 - **AAudio exclusive mode** on Android for lowest latency
 - **Low-latency performance** mode with hardware acceleration
 - **Seamless playback** — no pops, clicks, or glitches

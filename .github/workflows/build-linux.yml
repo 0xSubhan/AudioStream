@@ -6,6 +6,10 @@ on:
       - 'v*.*.*'
   workflow_dispatch:
 
+# Allow the token to create GitHub Releases and upload assets
+permissions:
+  contents: write
+
 jobs:
   build-linux:
     name: Build AudioStream (Linux x64)

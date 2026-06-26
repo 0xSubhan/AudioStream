@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*.*.*'
+    paths:
+      - 'core/**'
+      - 'pc_app/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/build-linux.yml'
   workflow_dispatch:
 
 # Allow the token to create GitHub Releases and upload assets

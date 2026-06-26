@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - 'v*.*.*'
+    paths:
+      - 'android_app/**'
+      - '.github/workflows/build-android.yml'
   workflow_dispatch:
 
 # Allow the token to upload to GitHub Releases

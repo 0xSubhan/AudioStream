@@ -97,7 +97,7 @@
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -149,7 +149,7 @@
 
 ---
 
-## ⚡ Performance
+## Performance
 
 Measured on a Ryzen 5 machine streaming to a Pixel 7 over 5GHz WiFi:
 
@@ -167,7 +167,7 @@ Measured on a Ryzen 5 machine streaming to a Pixel 7 over 5GHz WiFi:
 
 ---
 
-## 🔬 How It Works
+## How It Works
 
 <details>
 <summary><b>1. Audio Capture (PC)</b></summary>
@@ -221,7 +221,7 @@ The stream runs in its own high-priority real-time thread to prevent glitches fr
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### For End Users (Linux PC)
 
@@ -248,7 +248,7 @@ Download `app-release.apk` from the same releases page.
 1. Open **AudioStream** on your Android phone → tap **START RECEIVER**
 2. Open the **AudioStream Controller** on your PC
 3. Your phone appears automatically in the dropdown — select it and click **Start Streaming**
-4. 🎵 Audio from your PC streams to your phone instantly
+4. Audio from your PC streams to your phone instantly
 
 > Both devices must be on the **same WiFi network**.
 
@@ -303,7 +303,7 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 AudioStream/
@@ -357,7 +357,7 @@ AudioStream/
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 | Status | Feature |
 |---|---|
@@ -378,7 +378,7 @@ AudioStream/
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Here's how to get started:
 
@@ -392,20 +392,20 @@ Contributions are welcome! Here's how to get started:
 5. **Open a Pull Request** — describe what you changed and why
 
 ### Areas that need help
-- 🪟 **Windows support** — WASAPI audio capture backend
-- 🍎 **macOS support** — CoreAudio backend
-- 🧪 **More tests** — especially network/jitter simulation
-- 📖 **Documentation** — architecture deep-dives, API docs
+- **Windows support** — WASAPI audio capture backend
+- **macOS support** — CoreAudio backend
+- **More tests** — especially network/jitter simulation
+- **Documentation** — architecture deep-dives, API docs
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [**libopus**](https://opus-codec.org/) — The Opus codec for incredible audio compression
 - [**pybind11**](https://github.com/pybind/pybind11) — Seamless C++/Python interop

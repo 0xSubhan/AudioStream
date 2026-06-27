@@ -412,6 +412,7 @@ AudioStream/
 │
 ├── docs/
 │   ├── design_log.md              # Architecture decisions & changelog
+│   ├── CI_PIPELINE_DOC.md         # CI pipeline explained in detail
 │   └── screenshots/
 │
 ├── build_release.sh               # One-shot Linux release builder
@@ -443,7 +444,16 @@ AudioStream/
 
 ---
 
-## Contributing
+## 📄 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [CI Pipeline Doc](docs/CI_PIPELINE_DOC.md) | How the GitHub Actions CI works — all 3 build pipelines explained in detail |
+| [Design Log](docs/design_log.md) | Architecture decisions, technical changelog, and phase-by-phase development notes |
+
+---
+
+## 🤝 Contributing
 
 Contributions are welcome! Here's how to get started:
 

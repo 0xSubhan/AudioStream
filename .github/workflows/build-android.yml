@@ -2,11 +2,9 @@ name: Build Android APK
 
 on:
   push:
+    # Tags always trigger a release build (no path filter)
     tags:
       - 'v*.*.*'
-    paths:
-      - 'android_app/**'
-      - '.github/workflows/build-android.yml'
   workflow_dispatch:
 
 # Allow the token to upload to GitHub Releases

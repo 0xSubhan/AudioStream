@@ -74,3 +74,4 @@ __pycache__/
 dist/
 build/pyinstaller_work/
 pc_app/AudioStream.spec.bak
+audiostream-release.jks

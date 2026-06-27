@@ -42,35 +42,77 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | flutter doctor --android-licenses || true
 
-      # ── 5. Install Flutter dependencies ──────────────────────────
+      # ── 5. Set up release keystore ────────────────────────────────
+      # If the KEYSTORE_BASE64 secret is set, decode it and configure
+      # env vars so Gradle picks it up for a proper release signature.
+      # If the secret is missing (forks / first-time setup), the build
+      # falls back to the debug key automatically (see build.gradle.kts).
+      - name: Set up release keystore
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS_VAL: ${{ secrets.KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Using release keystore from secret"
+            echo "$KEYSTORE_BASE64" | base64 --decode > $RUNNER_TEMP/release.jks
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks"  >> $GITHUB_ENV
+            echo "KEYSTORE_PASSWORD=$STORE_PASSWORD"        >> $GITHUB_ENV
+            echo "KEY_ALIAS=$KEY_ALIAS_VAL"                >> $GITHUB_ENV
+            echo "KEY_PASSWORD=$KEY_PASS"                  >> $GITHUB_ENV
+          else
+            echo "KEYSTORE_BASE64 secret not set – building with debug key (CI-generated keystore will not be distributable but pipeline won't fail)"
+          fi
+
+      # ── 6. Install Flutter dependencies ──────────────────────────
       - name: Flutter pub get
         run: flutter pub get
         working-directory: android_app
 
-      # ── 6. Build release APK ──────────────────────────────────────
-      - name: Build release APK
+      # ── 7. Build universal release APK ───────────────────────────
+      - name: Build release APK (universal)
         run: flutter build apk --release
         working-directory: android_app
 
-      # ── 7. Rename APK to a clean filename ─────────────────────────
-      - name: Rename APK
-        run: |
-          cp android_app/build/app/outputs/flutter-apk/app-release.apk app-release.apk
-          echo "APK size: $(du -sh app-release.apk | cut -f1)"
+      # ── 8. Build per-ABI split APKs (smaller, install faster) ────
+      - name: Build release APKs (split per ABI)
+        run: flutter build apk --release --split-per-abi
+        working-directory: android_app
 
-      # ── 8. Upload as workflow artifact ───────────────────────────
-      - name: Upload APK artifact
+      # ── 9. Collect & rename artifacts ────────────────────────────
+      - name: Collect APKs
+        run: |
+          mkdir -p dist
+          # Universal fat APK
+          cp android_app/build/app/outputs/flutter-apk/app-release.apk \
+             dist/AudioStream-universal.apk
+
+          # Per-ABI splits (arm64 is what most modern phones need)
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            SRC="android_app/build/app/outputs/flutter-apk/app-${abi}-release.apk"
+            if [ -f "$SRC" ]; then
+              cp "$SRC" "dist/AudioStream-${abi}.apk"
+            fi
+          done
+
+          echo "── Built APKs ──────────────────────────────"
+          ls -lh dist/
+
+      # ── 10. Upload all APKs as workflow artifact ──────────────────
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: AudioStream-Android
-          path: app-release.apk
+          path: dist/
           retention-days: 30
 
-      # ── 9. Attach to GitHub Release ───────────────────────────────
+      # ── 11. Attach to GitHub Release ──────────────────────────────
       - name: Upload to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: app-release.apk
+          files: dist/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

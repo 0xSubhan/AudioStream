@@ -14,10 +14,32 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // ── Release signing ───────────────────────────────────────────────────────
+    // In CI: set KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+    // environment variables (via GitHub Secrets).  Locally it falls back to
+    // the debug key so `flutter run --release` still works.
+    signingConfigs {
+        val keystoreFile = System.getenv("KEYSTORE_FILE")?.let { file(it) }
+        val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+        val keyAlias = System.getenv("KEY_ALIAS")
+        val keyPassword = System.getenv("KEY_PASSWORD")
+
+        if (keystoreFile != null && keystoreFile.exists() &&
+            !keystorePassword.isNullOrEmpty() &&
+            !keyAlias.isNullOrEmpty() &&
+            !keyPassword.isNullOrEmpty()) {
+
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
+    }
+
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.audiostream.audiostream_app"
-        // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
@@ -41,9 +63,10 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Use the release signing config when available (CI), otherwise
+            // fall back to debug so local builds still work.
+            val releaseConfig = signingConfigs.findByName("release")
+            signingConfig = releaseConfig ?: signingConfigs.getByName("debug")
         }
     }
 }

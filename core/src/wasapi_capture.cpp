@@ -45,11 +45,8 @@ bool WasapiCapture::start() {
         return true;
     }
 
-    if (!initCom())       { return false; }
-    if (!openDevice())    { return false; }
-    if (!configureStream()) { return false; }
-
-    // Create a manual-reset event that we signal when the ring buffer has data
+    // Create a manual-reset event that we signal when the ring buffer has data.
+    // This is used only for the read() blocking wait — NOT passed to WASAPI.
     dataReadyEvent_ = CreateEvent(nullptr, TRUE, FALSE, nullptr);
     if (!dataReadyEvent_) {
         std::cerr << "[WasapiCapture] Failed to create dataReadyEvent." << std::endl;
@@ -57,9 +54,12 @@ bool WasapiCapture::start() {
     }
 
     running_ = true;
+    // The capture thread initialises COM and opens the WASAPI device itself.
+    // This avoids COM apartment mismatch (COM objects must be used on the thread
+    // that called CoInitializeEx for them).
     captureThread_ = std::thread(&WasapiCapture::captureLoop, this);
 
-    std::cout << "[WasapiCapture] WASAPI loopback capture started ("
+    std::cout << "[WasapiCapture] WASAPI loopback capture starting ("
               << sampleRate_ << "Hz, " << channels_ << "ch)." << std::endl;
     return true;
 }
@@ -71,10 +71,6 @@ bool WasapiCapture::stop() {
 
     running_ = false;
 
-    // Unblock the capture thread if it's waiting on hEvent_
-    if (hEvent_) {
-        SetEvent(hEvent_);
-    }
     // Unblock any pending read() call
     if (dataReadyEvent_) {
         SetEvent(dataReadyEvent_);
@@ -84,17 +80,10 @@ bool WasapiCapture::stop() {
         captureThread_.join();
     }
 
-    // Release WASAPI objects
-    if (captureClient_) { captureClient_->Release(); captureClient_ = nullptr; }
-    if (audioClient_)   { audioClient_->Stop();
-                          audioClient_->Release();   audioClient_   = nullptr; }
-    if (device_)        { device_->Release();        device_        = nullptr; }
-    if (enumerator_)    { enumerator_->Release();    enumerator_    = nullptr; }
-
-    if (hEvent_)        { CloseHandle(hEvent_);        hEvent_        = nullptr; }
-    if (dataReadyEvent_){ CloseHandle(dataReadyEvent_); dataReadyEvent_ = nullptr; }
-
-    CoUninitialize();
+    if (dataReadyEvent_) {
+        CloseHandle(dataReadyEvent_);
+        dataReadyEvent_ = nullptr;
+    }
 
     // Reset ring buffer
     {
@@ -123,7 +112,7 @@ int WasapiCapture::read(float* buffer, int frames) {
                     ringRead_  = (ringRead_ + 1) % static_cast<int>(ringBuf_.size());
                 }
                 ringFill_ -= samplesNeeded;
-                // Reset the event if ring is now empty-ish
+                // Reset the event if ring is now low
                 if (ringFill_ < samplesNeeded) {
                     ResetEvent(dataReadyEvent_);
                 }
@@ -142,11 +131,12 @@ double WasapiCapture::getLatencyMs() const {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Private helpers
+// Private helpers (called from the capture worker thread)
 // ─────────────────────────────────────────────────────────────────────────────
 
 bool WasapiCapture::initCom() {
-    // Initialize COM in multithreaded apartment (MTA) — required for WASAPI from a worker thread
+    // Must be called from the same thread that will use the COM objects.
+    // COINIT_MULTITHREADED is required for WASAPI from a dedicated worker thread.
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
         std::cerr << "[WasapiCapture] CoInitializeEx failed (0x" << std::hex << hr << ")." << std::endl;
@@ -167,7 +157,7 @@ bool WasapiCapture::openDevice() {
     // Get the default audio RENDER (output) endpoint.
     // WASAPI loopback intercepts this endpoint's output stream.
     hr = enumerator_->GetDefaultAudioEndpoint(eRender, eConsole, &device_);
-    CHECK_HR(hr, "GetDefaultAudioEndpoint failed — no audio output device found");
+    CHECK_HR(hr, "GetDefaultAudioEndpoint failed — ensure an audio output device (speakers/headphones) is connected and set as default");
 
     return true;
 }
@@ -195,28 +185,22 @@ bool WasapiCapture::configureStream() {
                   << "Will convert to " << sampleRate_ << "Hz " << channels_ << "ch." << std::endl;
     }
 
-    // Request a 20ms buffer period (same as Opus frame size — aligns capture and encode)
+    // Request a 20ms buffer period (aligns with Opus frame size)
     REFERENCE_TIME hnsRequestedDuration = 200000; // 20ms in 100ns units
 
-    // Initialize in LOOPBACK mode — this is the key flag that enables system audio capture
+    // CRITICAL: WASAPI loopback MUST NOT use AUDCLNT_STREAMFLAGS_EVENTCALLBACK.
+    // Combining LOOPBACK + EVENTCALLBACK is unsupported on Windows and causes
+    // IAudioClient::Initialize to return E_INVALIDARG (0x80070057), which silently
+    // breaks the entire capture pipeline. Use polling (Sleep-based) instead.
     hr = audioClient_->Initialize(
         AUDCLNT_SHAREMODE_SHARED,
-        AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+        AUDCLNT_STREAMFLAGS_LOOPBACK,   // ← loopback only, NO event callback flag
         hnsRequestedDuration,
         0,          // periodicity — 0 for shared mode
         nativeFmt,
         nullptr);
     CoTaskMemFree(nativeFmt);
     CHECK_HR(hr, "IAudioClient::Initialize (loopback) failed");
-
-    // Create and register the buffer-ready event
-    hEvent_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-    if (!hEvent_) {
-        std::cerr << "[WasapiCapture] CreateEvent failed." << std::endl;
-        return false;
-    }
-    hr = audioClient_->SetEventHandle(hEvent_);
-    CHECK_HR(hr, "SetEventHandle failed");
 
     // Query actual stream latency
     hr = audioClient_->GetStreamLatency(&streamLatency_);
@@ -235,24 +219,50 @@ bool WasapiCapture::configureStream() {
 }
 
 void WasapiCapture::captureLoop() {
-    // Elevate thread priority for audio processing to minimise glitches
+    // ── Step 1: Init COM on THIS thread ──────────────────────────────────────
+    // COM objects (IMMDeviceEnumerator, IAudioClient, etc.) must be created and
+    // used on the same thread that called CoInitializeEx. Doing this in start()
+    // (the main/Qt thread) and then using them here causes COM apartment errors.
+    if (!initCom()) {
+        std::cerr << "[WasapiCapture] COM init failed in capture thread." << std::endl;
+        running_ = false;
+        return;
+    }
+
+    // ── Step 2: Open WASAPI device on THIS thread ─────────────────────────────
+    if (!openDevice() || !configureStream()) {
+        std::cerr << "[WasapiCapture] Failed to open WASAPI device in capture thread." << std::endl;
+        // Release any partially-initialised COM objects
+        if (captureClient_) { captureClient_->Release(); captureClient_ = nullptr; }
+        if (audioClient_)   { audioClient_->Stop(); audioClient_->Release(); audioClient_ = nullptr; }
+        if (device_)        { device_->Release();        device_        = nullptr; }
+        if (enumerator_)    { enumerator_->Release();    enumerator_    = nullptr; }
+        CoUninitialize();
+        running_ = false;
+        return;
+    }
+
+    // ── Step 3: Elevate thread priority ──────────────────────────────────────
     DWORD taskIndex = 0;
     HANDLE hTask = AvSetMmThreadCharacteristicsW(L"Audio", &taskIndex);
 
-    while (running_) {
-        // Wait for WASAPI to signal that new audio data is available (max 100ms)
-        DWORD waitResult = WaitForSingleObject(hEvent_, 100);
-        if (!running_) break;
+    std::cout << "[WasapiCapture] Capture thread running." << std::endl;
 
-        if (waitResult == WAIT_TIMEOUT) {
-            // On timeout just loop — the audio session may be silent (loopback delivers
-            // silence packets when there's no active audio playback on Windows)
-            continue;
-        }
+    // ── Step 4: Polling capture loop ──────────────────────────────────────────
+    // WASAPI loopback does not support event-driven mode, so we poll every 10ms.
+    // This matches the 20ms Opus frame size, giving at least 1 full frame per poll.
+    while (running_) {
+        // Sleep for half the buffer duration to avoid busy-waiting
+        Sleep(10);
+
+        if (!running_) break;
 
         UINT32 packetSize = 0;
         HRESULT hr = captureClient_->GetNextPacketSize(&packetSize);
-        if (FAILED(hr)) break;
+        if (FAILED(hr)) {
+            std::cerr << "[WasapiCapture] GetNextPacketSize failed — audio device may have been disconnected." << std::endl;
+            break;
+        }
 
         while (packetSize > 0 && running_) {
             BYTE*  pData       = nullptr;
@@ -264,16 +274,10 @@ void WasapiCapture::captureLoop() {
 
             if (!(flags & AUDCLNT_BUFFERFLAGS_SILENT) && numFrames > 0 && pData) {
                 // WASAPI gives us IEEE float32 in shared mode (from GetMixFormat)
-                const float* src    = reinterpret_cast<const float*>(pData);
-                int          srcCh  = nativeChannels_;
-                int          dstCh  = channels_;
-                int          srcRate = nativeRate_;
-                int          dstRate = sampleRate_;
+                const float* src     = reinterpret_cast<const float*>(pData);
+                int          srcCh   = nativeChannels_;
+                int          dstCh   = channels_;
 
-                // Simple nearest-neighbour resampling + channel fold/expand
-                // For professional use you would replace this with a sinc resampler,
-                // but for 48kHz→48kHz (the common case on modern Windows) this path
-                // is not taken at all.
                 std::lock_guard<std::mutex> lock(ringMutex_);
 
                 for (UINT32 f = 0; f < numFrames && running_; ++f) {
@@ -312,6 +316,15 @@ done:
     if (hTask) {
         AvRevertMmThreadCharacteristics(hTask);
     }
+
+    // Release WASAPI objects on the same thread that created them (COM rule)
+    if (captureClient_) { captureClient_->Release(); captureClient_ = nullptr; }
+    if (audioClient_)   { audioClient_->Stop();
+                          audioClient_->Release();   audioClient_   = nullptr; }
+    if (device_)        { device_->Release();        device_        = nullptr; }
+    if (enumerator_)    { enumerator_->Release();    enumerator_    = nullptr; }
+    CoUninitialize();
+
     std::cout << "[WasapiCapture] Capture thread exiting." << std::endl;
 }
 

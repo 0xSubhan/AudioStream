@@ -28,10 +28,12 @@ namespace audiostream {
  * WASAPI loopback mode, which is the Windows equivalent of PulseAudio's
  * sink monitor source.
  *
- * The WASAPI stream runs in a high-priority background thread that drains
- * the hardware buffer and pushes interleaved float32 frames into an internal
- * ring buffer.  The public read() method blocks until enough frames are
- * available, matching the contract of PulseAudioCapture::read().
+ * IMPORTANT: WASAPI loopback does NOT support AUDCLNT_STREAMFLAGS_EVENTCALLBACK.
+ * This implementation uses a polling loop (Sleep-based) which is the correct
+ * and only supported approach for loopback capture on Windows.
+ *
+ * COM initialisation is performed inside the worker thread to satisfy COM
+ * apartment rules (objects must be used on the thread that created them).
  *
  * Requirements: Windows Vista or later (WASAPI), linked against
  *   ole32, oleaut32, avrt, uuid
@@ -62,12 +64,11 @@ private:
     int sampleRate_;
     int channels_;
 
-    // WASAPI COM objects (raw pointers managed by start()/stop())
-    IMMDeviceEnumerator* enumerator_  = nullptr;
-    IMMDevice*           device_      = nullptr;
-    IAudioClient*        audioClient_ = nullptr;
+    // WASAPI COM objects (raw pointers — created and released on the worker thread)
+    IMMDeviceEnumerator* enumerator_    = nullptr;
+    IMMDevice*           device_        = nullptr;
+    IAudioClient*        audioClient_   = nullptr;
     IAudioCaptureClient* captureClient_ = nullptr;
-    HANDLE               hEvent_      = nullptr;  // event signalled when new audio data arrives
 
     // Latency reported by WASAPI (in 100-ns units, converted to ms on query)
     REFERENCE_TIME streamLatency_ = 0;

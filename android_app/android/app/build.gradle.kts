@@ -1,7 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// ── Release signing ──────────────────────────────────────────────────────────
+// In CI: the workflow writes android/key.properties from GitHub Secrets.
+// Locally: if key.properties is absent the build falls back to the debug key
+// so `flutter run --release` still works without any manual setup.
+val keyPropertiesFile = rootProject.file("key.properties")
+val keyProperties = Properties()
+if (keyPropertiesFile.exists()) {
+    keyProperties.load(keyPropertiesFile.inputStream())
 }
 
 android {
@@ -14,26 +26,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // ── Release signing ───────────────────────────────────────────────────────
-    // In CI: set KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
-    // environment variables (via GitHub Secrets).  Locally it falls back to
-    // the debug key so `flutter run --release` still works.
     signingConfigs {
-        val keystoreFile = System.getenv("KEYSTORE_FILE")?.let { file(it) }
-        val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
-        val keyAlias = System.getenv("KEY_ALIAS")
-        val keyPassword = System.getenv("KEY_PASSWORD")
-
-        if (keystoreFile != null && keystoreFile.exists() &&
-            !keystorePassword.isNullOrEmpty() &&
-            !keyAlias.isNullOrEmpty() &&
-            !keyPassword.isNullOrEmpty()) {
-
+        if (keyPropertiesFile.exists()) {
             create("release") {
-                storeFile = keystoreFile
-                storePassword = keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
+                keyAlias     = keyProperties["keyAlias"]     as String
+                keyPassword  = keyProperties["keyPassword"]  as String
+                storeFile    = keyProperties["storeFile"]?.let { file(it as String) }
+                storePassword = keyProperties["storePassword"] as String
             }
         }
     }

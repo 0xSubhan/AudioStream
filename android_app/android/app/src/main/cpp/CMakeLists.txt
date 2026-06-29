@@ -29,12 +29,12 @@ add_library(audiostream_receiver SHARED
     android_receiver_engine.cpp
 )
 
-# CRITICAL: Suppress ALL default C++ include paths (blocks Snap-injected GCC 9 headers),
-# then explicitly re-add only the NDK's own libc++ standard library headers.
-target_compile_options(audiostream_receiver PRIVATE
-    -nostdinc++
-    -isystem ${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1
-)
+# The env-var clearing above (CPATH, C_INCLUDE_PATH, CPLUS_INCLUDE_PATH) is
+# sufficient to block Snap-injected GCC headers on the developer's machine.
+# Do NOT add -nostdinc++ here: on NDK r27+ (shipped with Flutter 3.22+) the
+# c++/v1 path was reorganised and the old explicit -isystem path no longer
+# exists, which causes the entire native-lib compile to silently fail and
+# produces an APK with no .so → Android refuses to install it.
 
 # 3. Link AAudio, Android Log, and the static Opus library
 target_link_libraries(audiostream_receiver

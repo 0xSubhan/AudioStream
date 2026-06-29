@@ -40,28 +40,42 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | flutter doctor --android-licenses || true
 
-      # ── 5. Set up release keystore ────────────────────────────────
-      # If the KEYSTORE_BASE64 secret is set, decode it and configure
-      # env vars so Gradle picks it up for a proper release signature.
-      # If the secret is missing (forks / first-time setup), the build
-      # falls back to the debug key automatically (see build.gradle.kts).
+      # ── 5. Write key.properties + decode keystore ─────────────────
+      # Uses the standard Flutter key.properties signing approach.
+      # On a tag push we REQUIRE the secrets to be set — the build will
+      # fail here rather than silently producing a debug-signed APK that
+      # Android phones refuse to install over a release-signed version.
       - name: Set up release keystore
-        id: keystore
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS_VAL: ${{ secrets.KEY_ALIAS }}
-          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_BASE64:   ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD:    ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS_VAL:     ${{ secrets.KEY_ALIAS }}
+          KEY_PASS:          ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Using release keystore from secret"
-            echo "$KEYSTORE_BASE64" | base64 --decode > $RUNNER_TEMP/release.jks
-            echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks"  >> $GITHUB_ENV
-            echo "KEYSTORE_PASSWORD=$STORE_PASSWORD"        >> $GITHUB_ENV
-            echo "KEY_ALIAS=$KEY_ALIAS_VAL"                >> $GITHUB_ENV
-            echo "KEY_PASSWORD=$KEY_PASS"                  >> $GITHUB_ENV
+            echo "✅ Release keystore secret found — using release signing"
+            KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+
+            # Write the canonical key.properties file that build.gradle.kts reads
+            cat > android_app/android/key.properties <<EOF
+          storeFile=$KEYSTORE_PATH
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS_VAL
+          keyPassword=$KEY_PASS
+          EOF
+
+            echo "key.properties written:"
+            cat android_app/android/key.properties
           else
-            echo "KEYSTORE_BASE64 secret not set – building with debug key (CI-generated keystore will not be distributable but pipeline won't fail)"
+            if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+              echo "❌ KEYSTORE_BASE64 secret is not set but this is a tag release build."
+              echo "   Add the four secrets to your repository:"
+              echo "   KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD"
+              exit 1
+            else
+              echo "⚠️  KEYSTORE_BASE64 not set — building with debug key (workflow_dispatch only)"
+            fi
           fi
 
       # ── 6. Install Flutter dependencies ──────────────────────────
@@ -69,25 +83,26 @@ jobs:
         run: flutter pub get
         working-directory: android_app
 
-      # ── 7. Build universal release APK ───────────────────────────
-      - name: Build release APK (universal)
-        run: flutter build apk --release
-        working-directory: android_app
-
-      # ── 8. Build per-ABI split APKs (smaller, install faster) ────
+      # ── 7. Build per-ABI split APKs ──────────────────────────────
       - name: Build release APKs (split per ABI)
         run: flutter build apk --release --split-per-abi
+        working-directory: android_app
+
+      # ── 8. Build universal fat APK ───────────────────────────────
+      - name: Build release APK (universal / fat)
+        run: flutter build apk --release
         working-directory: android_app
 
       # ── 9. Collect & rename artifacts ────────────────────────────
       - name: Collect APKs
         run: |
           mkdir -p dist
-          # Universal fat APK
+
+          # Universal fat APK (all ABIs in one file — safe fallback)
           cp android_app/build/app/outputs/flutter-apk/app-release.apk \
              dist/AudioStream-universal.apk
 
-          # Per-ABI splits (arm64 is what most modern phones need)
+          # Per-ABI splits (arm64-v8a is what most modern phones need)
           for abi in arm64-v8a armeabi-v7a x86_64; do
             SRC="android_app/build/app/outputs/flutter-apk/app-${abi}-release.apk"
             if [ -f "$SRC" ]; then

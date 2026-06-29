@@ -20,7 +20,7 @@
 
 [**⬇ Download for Linux**](https://github.com/0xSubhan/AudioStream/releases/latest/download/AudioStream) &nbsp;·&nbsp;
 [**⬇ Download for Windows**](https://github.com/0xSubhan/AudioStream/releases/latest/download/AudioStream.exe) &nbsp;·&nbsp;
-[**⬇ Get the Android APK**](https://github.com/0xSubhan/AudioStream/releases/latest/download/app-release.apk) &nbsp;·&nbsp;
+[**⬇ Get the Android APK**](https://github.com/0xSubhan/AudioStream/releases/latest/download/AudioStream-arm64-v8a.apk) &nbsp;·&nbsp;
 [**How It Works**](#-how-it-works) &nbsp;·&nbsp;
 [**Contributing**](#-contributing)
 
@@ -238,10 +238,11 @@ Double-click `AudioStream.exe` to run — no installation needed.
 
 **Step 2 — Install the Android APK**
 
-Download `app-release.apk` from the same releases page.
+Download `AudioStream-arm64-v8a.apk` from the same releases page.
 
-- Enable **"Install unknown apps"** in your Android settings
+- Enable **"Install unknown apps"** in your Android settings (one-time)
 - Open the APK file on your phone to install it
+- If **Google Play Protect** shows a warning, tap **"Install anyway"** — this is normal for apps not distributed through the Play Store
 
 **Step 3 — Stream!**
 
@@ -269,10 +270,11 @@ chmod +x AudioStream
 
 **Step 2 — Install the Android APK**
 
-Download `app-release.apk` from the same releases page.
+Download `AudioStream-arm64-v8a.apk` from the same releases page.
 
-- Enable **"Install unknown apps"** in your Android settings
+- Enable **"Install unknown apps"** in your Android settings (one-time)
 - Open the APK file on your phone to install it
+- If **Google Play Protect** shows a warning, tap **"Install anyway"** — this is normal for apps not distributed through the Play Store
 
 **Step 3 — Stream!**
 

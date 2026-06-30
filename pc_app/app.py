@@ -2,6 +2,12 @@ import sys
 import os
 import platform
 import socket
+
+# Ensure the directory containing this script is in sys.path so we can import audiostream_core
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+if _current_dir not in sys.path:
+    sys.path.insert(0, _current_dir)
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit, QComboBox, QFrame, QGridLayout,

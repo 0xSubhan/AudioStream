@@ -129,7 +129,7 @@ int WasapiCapture::read(float* buffer, int frames) {
             if (totalWaitTimeMs >= kMaxWaitTimeMs) {
                 // Output silence if we timed out waiting for real audio
                 std::lock_guard<std::mutex> lock(ringMutex_);
-                int samplesToRead = std::min(ringFill_, samplesNeeded);
+                int samplesToRead = (std::min)(ringFill_, samplesNeeded);
 
                 // Read whatever is in the ring buffer
                 for (int i = 0; i < samplesToRead; ++i) {

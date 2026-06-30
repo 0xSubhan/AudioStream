@@ -101,6 +101,8 @@ int WasapiCapture::read(float* buffer, int frames) {
     }
 
     int samplesNeeded = frames * channels_;
+    int totalWaitTimeMs = 0;
+    const int kMaxWaitTimeMs = 25;
 
     while (running_) {
         {
@@ -119,8 +121,34 @@ int WasapiCapture::read(float* buffer, int frames) {
                 return frames;
             }
         }
-        // Wait until the capture thread pushes more data (10ms timeout)
-        WaitForSingleObject(dataReadyEvent_, 10);
+
+        // Wait until the capture thread pushes more data (5ms timeout)
+        DWORD waitResult = WaitForSingleObject(dataReadyEvent_, 5);
+        if (waitResult == WAIT_TIMEOUT) {
+            totalWaitTimeMs += 5;
+            if (totalWaitTimeMs >= kMaxWaitTimeMs) {
+                // Output silence if we timed out waiting for real audio
+                std::lock_guard<std::mutex> lock(ringMutex_);
+                int samplesToRead = std::min(ringFill_, samplesNeeded);
+
+                // Read whatever is in the ring buffer
+                for (int i = 0; i < samplesToRead; ++i) {
+                    buffer[i] = ringBuf_[ringRead_];
+                    ringRead_  = (ringRead_ + 1) % static_cast<int>(ringBuf_.size());
+                }
+                ringFill_ -= samplesToRead;
+
+                // Pad the rest of the buffer with silence
+                for (int i = samplesToRead; i < samplesNeeded; ++i) {
+                    buffer[i] = 0.0f;
+                }
+
+                if (ringFill_ < samplesNeeded) {
+                    ResetEvent(dataReadyEvent_);
+                }
+                return frames;
+            }
+        }
     }
     return -1;
 }

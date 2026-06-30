@@ -45,9 +45,9 @@ bool WasapiCapture::start() {
         return true;
     }
 
-    // Create a manual-reset event that we signal when the ring buffer has data.
+    // Create an auto-reset event that we signal when the ring buffer has data.
     // This is used only for the read() blocking wait — NOT passed to WASAPI.
-    dataReadyEvent_ = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+    dataReadyEvent_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
     if (!dataReadyEvent_) {
         std::cerr << "[WasapiCapture] Failed to create dataReadyEvent." << std::endl;
         return false;
@@ -114,10 +114,6 @@ int WasapiCapture::read(float* buffer, int frames) {
                     ringRead_  = (ringRead_ + 1) % static_cast<int>(ringBuf_.size());
                 }
                 ringFill_ -= samplesNeeded;
-                // Reset the event if ring is now low
-                if (ringFill_ < samplesNeeded) {
-                    ResetEvent(dataReadyEvent_);
-                }
                 return frames;
             }
         }
@@ -141,10 +137,6 @@ int WasapiCapture::read(float* buffer, int frames) {
                 // Pad the rest of the buffer with silence
                 for (int i = samplesToRead; i < samplesNeeded; ++i) {
                     buffer[i] = 0.0f;
-                }
-
-                if (ringFill_ < samplesNeeded) {
-                    ResetEvent(dataReadyEvent_);
                 }
                 return frames;
             }

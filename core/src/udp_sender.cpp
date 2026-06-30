@@ -12,7 +12,6 @@
   // Map POSIX-style names to Winsock equivalents
   #define CLOSE_SOCKET(fd) closesocket(fd)
   #define SOCKET_ERROR_CODE WSAGetLastError()
-  using socket_t = SOCKET;
   static const socket_t INVALID_SOCKET_VAL = INVALID_SOCKET;
 #else
   #include <unistd.h>
@@ -21,7 +20,6 @@
   #include <cerrno>
   #define CLOSE_SOCKET(fd) ::close(fd)
   #define SOCKET_ERROR_CODE errno
-  using socket_t = int;
   static const socket_t INVALID_SOCKET_VAL = -1;
 #endif
 
@@ -29,7 +27,7 @@
 namespace audiostream {
 
 UdpSender::UdpSender()
-    : socketFd_(static_cast<int>(INVALID_SOCKET_VAL)),
+    : socketFd_(INVALID_SOCKET_VAL),
       isInitialized_(false) {
     std::memset(&destAddr_, 0, sizeof(destAddr_));
 #ifdef _WIN32
@@ -61,7 +59,7 @@ bool UdpSender::init(const std::string& ip, int port) {
         std::cerr << "[UdpSender] Failed to create socket (err=" << SOCKET_ERROR_CODE << ")" << std::endl;
         return false;
     }
-    socketFd_ = static_cast<int>(sock);
+    socketFd_ = sock;
 
     // 2. Resolve target IPv4 address
     destAddr_.sin_family = AF_INET;
@@ -107,7 +105,7 @@ bool UdpSender::init(const std::string& ip, int port) {
 }
 
 int UdpSender::send(const uint8_t* data, int len) {
-    if (!isInitialized_ || socketFd_ < 0) {
+    if (!isInitialized_ || socketFd_ == INVALID_SOCKET_VAL) {
         std::cerr << "[UdpSender] UdpSender is not initialized!" << std::endl;
         return -1;
     }
@@ -133,9 +131,9 @@ int UdpSender::send(const uint8_t* data, int len) {
 }
 
 void UdpSender::closeSocket() {
-    if (socketFd_ >= 0) {
+    if (socketFd_ != INVALID_SOCKET_VAL) {
         CLOSE_SOCKET(socketFd_);
-        socketFd_ = static_cast<int>(INVALID_SOCKET_VAL);
+        socketFd_ = INVALID_SOCKET_VAL;
     }
     isInitialized_ = false;
 }

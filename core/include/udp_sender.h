@@ -3,14 +3,16 @@
 #include <string>
 #include <cstdint>
 
-// Cross-platform socket address type
+// Cross-platform socket type
 #ifdef _WIN32
   #ifndef WIN32_LEAN_AND_MEAN
     #define WIN32_LEAN_AND_MEAN
   #endif
-  #include <winsock2.h>  // provides struct sockaddr_in on Windows
+  #include <winsock2.h>  // provides SOCKET, struct sockaddr_in on Windows
+  using socket_t = SOCKET;
 #else
   #include <netinet/in.h>
+  using socket_t = int;
 #endif
 
 namespace audiostream {
@@ -46,7 +48,7 @@ public:
     void closeSocket();
 
 private:
-    int socketFd_;
+    socket_t socketFd_;  // SOCKET (UINT_PTR) on Windows, int on Linux
     struct sockaddr_in destAddr_;
     bool isInitialized_;
 };

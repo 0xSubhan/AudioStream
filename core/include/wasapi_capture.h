@@ -96,6 +96,8 @@ private:
     bool   needsResample_     = false;
     int    nativeRate_        = 0;
     int    nativeChannels_    = 0;
+    bool   nativeIsFloat_     = true;
+    int    nativeBitsPerSample_ = 32;
 };
 
 } // namespace audiostream

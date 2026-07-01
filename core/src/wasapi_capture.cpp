@@ -188,9 +188,10 @@ double WasapiCapture::getLatencyMs() const {
 // ─────────────────────────────────────────────────────────────────────────────
 
 bool WasapiCapture::initCom() {
-    // Must be called from the same thread that will use the COM objects.
-    log_debug("Calling CoInitializeEx with COINIT_APARTMENTTHREADED...");
-    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    // Use MTA — STA requires a message pump which our worker thread does not have,
+    // causing COM marshaling inside IAudioClient::Start() to deadlock.
+    log_debug("Calling CoInitializeEx with COINIT_MULTITHREADED...");
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     {
         std::ostringstream ss;
         ss << "CoInitializeEx returned HRESULT = 0x" << std::hex << hr;
@@ -239,72 +240,69 @@ bool WasapiCapture::configureStream() {
                             reinterpret_cast<void**>(&audioClient_));
     CHECK_HR(hr, "IAudioClient Activate failed");
 
-    // Query the device's native mix format
+    // Log the native mix format for diagnostics only
     WAVEFORMATEX* nativeFmt = nullptr;
     hr = audioClient_->GetMixFormat(&nativeFmt);
-    CHECK_HR(hr, "GetMixFormat failed");
-
-    // Inspect native format for resampling needs
-    nativeRate_     = static_cast<int>(nativeFmt->nSamplesPerSec);
-    nativeChannels_ = static_cast<int>(nativeFmt->nChannels);
-    nativeBitsPerSample_ = nativeFmt->wBitsPerSample;
-    nativeIsFloat_  = true; // default
-
-    if (nativeFmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
-        WAVEFORMATEXTENSIBLE* ext = reinterpret_cast<WAVEFORMATEXTENSIBLE*>(nativeFmt);
-        if (ext->SubFormat == KSDATAFORMAT_SUBTYPE_PCM) {
-            nativeIsFloat_ = false;
-        } else if (ext->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT) {
-            nativeIsFloat_ = true;
+    if (SUCCEEDED(hr) && nativeFmt) {
+        nativeRate_          = static_cast<int>(nativeFmt->nSamplesPerSec);
+        nativeChannels_      = static_cast<int>(nativeFmt->nChannels);
+        nativeBitsPerSample_ = nativeFmt->wBitsPerSample;
+        nativeIsFloat_       = true;
+        if (nativeFmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
+            auto* ext = reinterpret_cast<WAVEFORMATEXTENSIBLE*>(nativeFmt);
+            nativeIsFloat_ = (ext->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT);
+        } else {
+            nativeIsFloat_ = (nativeFmt->wFormatTag == WAVE_FORMAT_IEEE_FLOAT);
         }
-    } else if (nativeFmt->wFormatTag == WAVE_FORMAT_PCM) {
-        nativeIsFloat_ = false;
-    } else if (nativeFmt->wFormatTag == WAVE_FORMAT_IEEE_FLOAT) {
-        nativeIsFloat_ = true;
-    }
-
-    {
         std::ostringstream fmtLog;
-        fmtLog << "Native format: " << nativeRate_ << "Hz, " 
-               << nativeChannels_ << "ch, " << nativeBitsPerSample_ << "-bit " 
+        fmtLog << "Native format: " << nativeRate_ << "Hz, "
+               << nativeChannels_ << "ch, " << nativeBitsPerSample_ << "-bit "
                << (nativeIsFloat_ ? "Float" : "PCM");
         log_debug(fmtLog.str());
+        CoTaskMemFree(nativeFmt);
+        nativeFmt = nullptr;
     }
 
-    needsResample_  = (nativeRate_ != sampleRate_) || (nativeChannels_ != channels_);
+    // Build our own well-defined target format: 48 kHz, stereo, 32-bit IEEE float.
+    // AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM tells Windows to handle all sample-rate
+    // and format conversion internally — this is the most stable initialization path.
+    WAVEFORMATEXTENSIBLE wfx = {};
+    wfx.Format.wFormatTag      = WAVE_FORMAT_EXTENSIBLE;
+    wfx.Format.nChannels       = static_cast<WORD>(channels_);
+    wfx.Format.nSamplesPerSec  = static_cast<DWORD>(sampleRate_);
+    wfx.Format.wBitsPerSample  = 32;
+    wfx.Format.nBlockAlign     = wfx.Format.nChannels * 4;
+    wfx.Format.nAvgBytesPerSec = wfx.Format.nSamplesPerSec * wfx.Format.nBlockAlign;
+    wfx.Format.cbSize          = 22;
+    wfx.Samples.wValidBitsPerSample = 32;
+    wfx.dwChannelMask = (channels_ == 2) ? KSAUDIO_SPEAKER_STEREO : KSAUDIO_SPEAKER_MONO;
+    wfx.SubFormat     = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
+    // From now on, data from captureLoop is always 48kHz / stereo / float32
+    nativeIsFloat_       = true;
+    nativeBitsPerSample_ = 32;
+    nativeChannels_      = channels_;
+    nativeRate_          = sampleRate_;
+    needsResample_       = false;
 
-    if (needsResample_) {
-        std::ostringstream resLog;
-        resLog << "[WasapiCapture] Native format: "
-               << nativeRate_ << "Hz " << nativeChannels_ << "ch. "
-               << "Will convert to " << sampleRate_ << "Hz " << channels_ << "ch.";
-        log_debug(resLog.str());
-        std::cout << resLog.str() << std::endl;
-    }
-
-    // Request the default buffer period (0) for maximum stability
-    REFERENCE_TIME hnsRequestedDuration = 0;
-
-    log_debug("Calling audioClient_->Initialize...");
+    log_debug("Calling audioClient_->Initialize with AUTOCONVERTPCM...");
     hr = audioClient_->Initialize(
         AUDCLNT_SHAREMODE_SHARED,
-        AUDCLNT_STREAMFLAGS_LOOPBACK,   // ← loopback only, NO event callback flag
-        hnsRequestedDuration,
-        0,          // periodicity — 0 for shared mode
-        nativeFmt,
+        AUDCLNT_STREAMFLAGS_LOOPBACK |
+        AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM |
+        AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
+        0,       // hnsBufferDuration — 0 = engine default
+        0,       // hnsPeriodicity   — 0 for shared mode
+        reinterpret_cast<WAVEFORMATEX*>(&wfx),
         nullptr);
     log_debug("Checking Initialize HRESULT...");
-    if (FAILED(hr)) {
-        CoTaskMemFree(nativeFmt);
-        CHECK_HR(hr, "IAudioClient::Initialize (loopback) failed");
-    }
+    CHECK_HR(hr, "IAudioClient::Initialize (loopback+autoconvert) failed");
 
     // Query actual stream latency
     log_debug("Querying stream latency...");
     hr = audioClient_->GetStreamLatency(&streamLatency_);
     if (FAILED(hr)) {
-        log_debug("GetStreamLatency failed, using fallback duration");
-        streamLatency_ = hnsRequestedDuration;
+        log_debug("GetStreamLatency failed, using 0");
+        streamLatency_ = 0;
     }
 
     // Query and log actual allocated buffer size
@@ -318,26 +316,25 @@ bool WasapiCapture::configureStream() {
     log_debug("Querying IAudioCaptureClient service...");
     hr = audioClient_->GetService(__uuidof(IAudioCaptureClient),
                                   reinterpret_cast<void**>(&captureClient_));
-    if (FAILED(hr)) {
-        CoTaskMemFree(nativeFmt);
-        CHECK_HR(hr, "GetService(IAudioCaptureClient) failed");
-    }
+    CHECK_HR(hr, "GetService(IAudioCaptureClient) failed");
 
     log_debug("Starting audioClient...");
-    hr = audioClient_->Start();
+    HRESULT hrStart = E_FAIL;
+    __try {
+        hrStart = audioClient_->Start();
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        DWORD code = GetExceptionCode();
+        std::ostringstream ex;
+        ex << "EXCEPTION inside audioClient_->Start()! Code=0x" << std::hex << code;
+        log_debug(ex.str());
+        return false;
+    }
     {
         std::ostringstream ss;
-        ss << "audioClient_->Start() returned HRESULT = 0x" << std::hex << hr;
+        ss << "audioClient_->Start() returned HRESULT = 0x" << std::hex << hrStart;
         log_debug(ss.str());
     }
-    if (FAILED(hr)) {
-        CoTaskMemFree(nativeFmt);
-        CHECK_HR(hr, "IAudioClient::Start failed");
-    }
-
-    // Free the format structure now that we are fully configured and started
-    log_debug("Freeing nativeFmt via CoTaskMemFree...");
-    CoTaskMemFree(nativeFmt);
+    CHECK_HR(hrStart, "IAudioClient::Start failed");
 
     {
         std::ostringstream latLog;

@@ -277,10 +277,11 @@ bool WasapiCapture::configureStream() {
         0,          // periodicity — 0 for shared mode
         nativeFmt,
         nullptr);
-    log_debug("Calling CoTaskMemFree...");
-    CoTaskMemFree(nativeFmt);
     log_debug("Checking Initialize HRESULT...");
-    CHECK_HR(hr, "IAudioClient::Initialize (loopback) failed");
+    if (FAILED(hr)) {
+        CoTaskMemFree(nativeFmt);
+        CHECK_HR(hr, "IAudioClient::Initialize (loopback) failed");
+    }
 
     // Query actual stream latency
     log_debug("Querying stream latency...");
@@ -293,11 +294,26 @@ bool WasapiCapture::configureStream() {
     log_debug("Querying IAudioCaptureClient service...");
     hr = audioClient_->GetService(__uuidof(IAudioCaptureClient),
                                   reinterpret_cast<void**>(&captureClient_));
-    CHECK_HR(hr, "GetService(IAudioCaptureClient) failed");
+    if (FAILED(hr)) {
+        CoTaskMemFree(nativeFmt);
+        CHECK_HR(hr, "GetService(IAudioCaptureClient) failed");
+    }
 
     log_debug("Starting audioClient...");
     hr = audioClient_->Start();
-    CHECK_HR(hr, "IAudioClient::Start failed");
+    {
+        std::ostringstream ss;
+        ss << "audioClient_->Start() returned HRESULT = 0x" << std::hex << hr;
+        log_debug(ss.str());
+    }
+    if (FAILED(hr)) {
+        CoTaskMemFree(nativeFmt);
+        CHECK_HR(hr, "IAudioClient::Start failed");
+    }
+
+    // Free the format structure now that we are fully configured and started
+    log_debug("Freeing nativeFmt via CoTaskMemFree...");
+    CoTaskMemFree(nativeFmt);
 
     {
         std::ostringstream latLog;

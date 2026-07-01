@@ -189,8 +189,13 @@ double WasapiCapture::getLatencyMs() const {
 
 bool WasapiCapture::initCom() {
     // Must be called from the same thread that will use the COM objects.
-    // COINIT_MULTITHREADED is required for WASAPI from a dedicated worker thread.
-    HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    log_debug("Calling CoInitializeEx with COINIT_APARTMENTTHREADED...");
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    {
+        std::ostringstream ss;
+        ss << "CoInitializeEx returned HRESULT = 0x" << std::hex << hr;
+        log_debug(ss.str());
+    }
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
         std::cerr << "[WasapiCapture] CoInitializeEx failed (0x" << std::hex << hr << ")." << std::endl;
         return false;
@@ -211,6 +216,17 @@ bool WasapiCapture::openDevice() {
     // WASAPI loopback intercepts this endpoint's output stream.
     hr = enumerator_->GetDefaultAudioEndpoint(eRender, eConsole, &device_);
     CHECK_HR(hr, "GetDefaultAudioEndpoint failed — ensure an audio output device (speakers/headphones) is connected and set as default");
+
+    // Query and log default audio device state
+    DWORD state = 0;
+    hr = device_->GetState(&state);
+    if (SUCCEEDED(hr)) {
+        std::ostringstream ss;
+        ss << "Default audio device state = " << state << " (1=Active, 2=Disabled, 4=NotPresent, 8=Unplugged)";
+        log_debug(ss.str());
+    } else {
+        log_debug("GetState on audio device failed");
+    }
 
     return true;
 }
@@ -266,8 +282,8 @@ bool WasapiCapture::configureStream() {
         std::cout << resLog.str() << std::endl;
     }
 
-    // Request a 20ms buffer period (aligns with Opus frame size)
-    REFERENCE_TIME hnsRequestedDuration = 200000; // 20ms in 100ns units
+    // Request the default buffer period (0) for maximum stability
+    REFERENCE_TIME hnsRequestedDuration = 0;
 
     log_debug("Calling audioClient_->Initialize...");
     hr = audioClient_->Initialize(
@@ -289,6 +305,14 @@ bool WasapiCapture::configureStream() {
     if (FAILED(hr)) {
         log_debug("GetStreamLatency failed, using fallback duration");
         streamLatency_ = hnsRequestedDuration;
+    }
+
+    // Query and log actual allocated buffer size
+    UINT32 bufferFrameCount = 0;
+    if (SUCCEEDED(audioClient_->GetBufferSize(&bufferFrameCount))) {
+        std::ostringstream ss;
+        ss << "WASAPI allocated buffer size = " << bufferFrameCount << " frames";
+        log_debug(ss.str());
     }
 
     log_debug("Querying IAudioCaptureClient service...");

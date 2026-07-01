@@ -3,6 +3,19 @@ import os
 import platform
 import socket
 
+# ── Windows debug log file ────────────────────────────────────────────────────
+# Since the .exe has no console window, redirect all stdout/stderr to a file
+# so we can diagnose C++ errors. Log is written next to the .exe.
+if platform.system() == "Windows":
+    import io
+    _log_path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "AudioStream_debug.log")
+    _log_file = open(_log_path, "w", encoding="utf-8", buffering=1)
+    sys.stdout = _log_file
+    sys.stderr = _log_file
+    print(f"[Python] AudioStream starting — log: {_log_path}")
+    print(f"[Python] Python {sys.version}")
+    print(f"[Python] sys.argv[0] = {sys.argv[0]}")
+
 # Ensure the directory containing this script is in sys.path so we can import audiostream_core
 _current_dir = os.path.dirname(os.path.abspath(__file__))
 if _current_dir not in sys.path:
@@ -339,6 +352,7 @@ class MainWindow(QMainWindow):
                                 f"'{port_str}' is not a valid port number (1–65535).")
             return
 
+        print(f"[Python] Calling controller.start({ip}, {port})")
         if self.controller.start(ip, port):
             self.timer.start(100)
             self.toggle_button.setText("Stop Streaming")
@@ -373,6 +387,7 @@ class MainWindow(QMainWindow):
 
         # Detect unexpected engine stop (e.g. driver failure)
         if not self.controller.is_streaming():
+            print(f"[Python] UNEXPECTED STOP detected — is_streaming() returned False. packets={packets}, latency={latency}")
             self._stop_streaming()
             self.status_text.setText("Stream stopped unexpectedly")
             self.status_text.setStyleSheet("font-size: 14px; font-weight: 500; color: #FF453A;")

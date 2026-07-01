@@ -4,17 +4,26 @@ import platform
 import socket
 
 # ── Windows debug log file ────────────────────────────────────────────────────
-# Since the .exe has no console window, redirect all stdout/stderr to a file
-# so we can diagnose C++ errors. Log is written next to the .exe.
+# Redirect BOTH Python and C++ output to a log file.
+# sys.stdout only catches Python print(). C++ std::cout/std::cerr write to
+# OS-level file descriptors 1 and 2. os.dup2 redirects those so ALL output
+# (including every [WasapiCapture], [StreamController] message) goes to the log.
 if platform.system() == "Windows":
-    import io
     _log_path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "AudioStream_debug.log")
-    _log_file = open(_log_path, "w", encoding="utf-8", buffering=1)
+    # Open log file and get its OS file descriptor
+    _log_raw_fd = os.open(_log_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+    # Redirect fd 1 (C stdout) and fd 2 (C stderr) → log file
+    # This captures C++ std::cout and std::cerr from the compiled extension
+    os.dup2(_log_raw_fd, 1)
+    os.dup2(_log_raw_fd, 2)
+    # Also redirect Python's sys.stdout/sys.stderr
+    _log_file = os.fdopen(os.dup(_log_raw_fd), "w", encoding="utf-8", buffering=1)
+    os.close(_log_raw_fd)
     sys.stdout = _log_file
     sys.stderr = _log_file
-    print(f"[Python] AudioStream starting — log: {_log_path}")
-    print(f"[Python] Python {sys.version}")
-    print(f"[Python] sys.argv[0] = {sys.argv[0]}")
+    print(f"[Python] AudioStream starting -- log: {_log_path}", flush=True)
+    print(f"[Python] Python {sys.version}", flush=True)
+    print(f"[Python] sys.argv[0] = {sys.argv[0]}", flush=True)
 
 # Ensure the directory containing this script is in sys.path so we can import audiostream_core
 _current_dir = os.path.dirname(os.path.abspath(__file__))

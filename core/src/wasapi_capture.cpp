@@ -331,6 +331,53 @@ bool WasapiCapture::configureStream() {
                                   reinterpret_cast<void**>(&captureClient_));
     CHECK_HR(hr, "GetService(IAudioCaptureClient) failed");
 
+    // ── Silent render stream ──────────────────────────────────────────────────
+    // WASAPI loopback Start() can hang indefinitely when the audio engine has no
+    // active render stream (e.g. nothing is playing). The engine may be idle or
+    // powered down. Starting a silent render client on the same device keeps the
+    // engine running, allowing the loopback capture to start immediately.
+    log_debug("Starting silent render stream to wake audio engine...");
+    hr = device_->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
+                           reinterpret_cast<void**>(&silentRenderClient_));
+    if (SUCCEEDED(hr)) {
+        HRESULT hrRender = silentRenderClient_->Initialize(
+            AUDCLNT_SHAREMODE_SHARED,
+            0,  // no loopback, no event callback — plain render
+            0, 0,
+            reinterpret_cast<WAVEFORMATEX*>(&wfx),
+            nullptr);
+        if (SUCCEEDED(hrRender)) {
+            // Pre-fill the render buffer with silence so the engine doesn't starve
+            IAudioRenderClient* pRC = nullptr;
+            if (SUCCEEDED(silentRenderClient_->GetService(__uuidof(IAudioRenderClient),
+                                                          reinterpret_cast<void**>(&pRC)))) {
+                UINT32 nFrames = 0;
+                silentRenderClient_->GetBufferSize(&nFrames);
+                BYTE* pBuf = nullptr;
+                if (SUCCEEDED(pRC->GetBuffer(nFrames, &pBuf))) {
+                    // Release with AUDCLNT_BUFFERFLAGS_SILENT — no need to zero pBuf
+                    pRC->ReleaseBuffer(nFrames, AUDCLNT_BUFFERFLAGS_SILENT);
+                }
+                pRC->Release();
+            }
+            hrRender = silentRenderClient_->Start();
+            if (SUCCEEDED(hrRender)) {
+                log_debug("Silent render stream started successfully.");
+            } else {
+                std::ostringstream ss;
+                ss << "Silent render Start() returned 0x" << std::hex << hrRender << " (non-fatal)";
+                log_debug(ss.str());
+            }
+        } else {
+            std::ostringstream ss;
+            ss << "Silent render Initialize() returned 0x" << std::hex << hrRender << " (non-fatal)";
+            log_debug(ss.str());
+        }
+    } else {
+        log_debug("Could not activate silent render client (non-fatal).");
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     log_debug("Starting audioClient...");
     DWORD exCode = 0;
     HRESULT hrStart = seh_start_audio_client(audioClient_, &exCode);
@@ -476,6 +523,10 @@ done:
     if (audioClient_)   {
         audioClient_->Stop();
         audioClient_->Release();   audioClient_   = nullptr;
+    }
+    if (silentRenderClient_) {
+        silentRenderClient_->Stop();
+        silentRenderClient_->Release(); silentRenderClient_ = nullptr;
     }
     if (device_)        { device_->Release();        device_        = nullptr; }
     if (enumerator_)    { enumerator_->Release();    enumerator_    = nullptr; }

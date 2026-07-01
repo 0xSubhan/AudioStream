@@ -67,8 +67,10 @@ private:
     // WASAPI COM objects (raw pointers — created and released on the worker thread)
     IMMDeviceEnumerator* enumerator_    = nullptr;
     IMMDevice*           device_        = nullptr;
-    IAudioClient*        audioClient_   = nullptr;
-    IAudioCaptureClient* captureClient_ = nullptr;
+    IAudioClient*        audioClient_          = nullptr;
+    IAudioCaptureClient* captureClient_        = nullptr;
+    // Silent render stream — keeps the audio engine running so loopback Start() doesn't hang
+    IAudioClient*        silentRenderClient_   = nullptr;
 
     // Latency reported by WASAPI (in 100-ns units, converted to ms on query)
     REFERENCE_TIME streamLatency_ = 0;

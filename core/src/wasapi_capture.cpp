@@ -269,10 +269,7 @@ bool WasapiCapture::configureStream() {
     // Request a 20ms buffer period (aligns with Opus frame size)
     REFERENCE_TIME hnsRequestedDuration = 200000; // 20ms in 100ns units
 
-    // CRITICAL: WASAPI loopback MUST NOT use AUDCLNT_STREAMFLAGS_EVENTCALLBACK.
-    // Combining LOOPBACK + EVENTCALLBACK is unsupported on Windows and causes
-    // IAudioClient::Initialize to return E_INVALIDARG (0x80070057), which silently
-    // breaks the entire capture pipeline. Use polling (Sleep-based) instead.
+    log_debug("Calling audioClient_->Initialize...");
     hr = audioClient_->Initialize(
         AUDCLNT_SHAREMODE_SHARED,
         AUDCLNT_STREAMFLAGS_LOOPBACK,   // ← loopback only, NO event callback flag
@@ -280,17 +277,25 @@ bool WasapiCapture::configureStream() {
         0,          // periodicity — 0 for shared mode
         nativeFmt,
         nullptr);
+    log_debug("Calling CoTaskMemFree...");
     CoTaskMemFree(nativeFmt);
+    log_debug("Checking Initialize HRESULT...");
     CHECK_HR(hr, "IAudioClient::Initialize (loopback) failed");
 
     // Query actual stream latency
+    log_debug("Querying stream latency...");
     hr = audioClient_->GetStreamLatency(&streamLatency_);
-    if (FAILED(hr)) streamLatency_ = hnsRequestedDuration;
+    if (FAILED(hr)) {
+        log_debug("GetStreamLatency failed, using fallback duration");
+        streamLatency_ = hnsRequestedDuration;
+    }
 
+    log_debug("Querying IAudioCaptureClient service...");
     hr = audioClient_->GetService(__uuidof(IAudioCaptureClient),
                                   reinterpret_cast<void**>(&captureClient_));
     CHECK_HR(hr, "GetService(IAudioCaptureClient) failed");
 
+    log_debug("Starting audioClient...");
     hr = audioClient_->Start();
     CHECK_HR(hr, "IAudioClient::Start failed");
 

@@ -37,6 +37,19 @@ inline void log_debug(const std::string& msg) {
         return false; \
     }
 
+// SEH helper — must be a plain function with no C++ objects (MSVC C2712 rule).
+// Returns the HRESULT from Start(), or sets *outCode to the exception code on crash.
+static HRESULT seh_start_audio_client(IAudioClient* client, DWORD* outCode) {
+    *outCode = 0;
+    HRESULT hr = E_FAIL;
+    __try {
+        hr = client->Start();
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        *outCode = GetExceptionCode();
+    }
+    return hr;
+}
+
 namespace audiostream {
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -319,13 +332,11 @@ bool WasapiCapture::configureStream() {
     CHECK_HR(hr, "GetService(IAudioCaptureClient) failed");
 
     log_debug("Starting audioClient...");
-    HRESULT hrStart = E_FAIL;
-    __try {
-        hrStart = audioClient_->Start();
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
-        DWORD code = GetExceptionCode();
+    DWORD exCode = 0;
+    HRESULT hrStart = seh_start_audio_client(audioClient_, &exCode);
+    if (exCode != 0) {
         std::ostringstream ex;
-        ex << "EXCEPTION inside audioClient_->Start()! Code=0x" << std::hex << code;
+        ex << "EXCEPTION inside audioClient_->Start()! Code=0x" << std::hex << exCode;
         log_debug(ex.str());
         return false;
     }

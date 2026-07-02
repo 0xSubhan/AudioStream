@@ -68,6 +68,10 @@ a = Analysis(
     noarchive=False,
 )
 
+# Exclude conflicting MSVCP140.dll packaged by PyQt6 to force using system standard runtime
+a.binaries = [x for x in a.binaries if not x[0].lower().endswith('msvcp140.dll')]
+
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(

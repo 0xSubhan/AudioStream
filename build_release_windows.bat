@@ -62,7 +62,7 @@ if defined VCPKG_ROOT (
     echo [warn]  Set VCPKG_ROOT to your vcpkg install dir and re-run, or install Opus manually.
 )
 
-cmake -B "%BUILD_DIR%" -S "%SCRIPT_DIR%" -DCMAKE_BUILD_TYPE=Release %VCPKG_TOOLCHAIN%
+cmake -G "Visual Studio 17 2022" -A x64 -B "%BUILD_DIR%" -S "%SCRIPT_DIR%." -DCMAKE_BUILD_TYPE=Release %VCPKG_TOOLCHAIN%
 if %ERRORLEVEL% neq 0 (
     echo [error] CMake configure step failed. Check output above.
     exit /b 1

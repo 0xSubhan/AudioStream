@@ -65,6 +65,10 @@ public:
             return false;
         }
 
+        // Allow rapid re-use of the port after a crash/restart
+        int reuse = 1;
+        setsockopt(socketFd_, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
         struct sockaddr_in addr{};
         std::memset(&addr, 0, sizeof(addr));
         addr.sin_family = AF_INET;
@@ -72,13 +76,14 @@ public:
         addr.sin_port = htons(static_cast<uint16_t>(port));
 
         if (bind(socketFd_, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
-            LOGE("Failed to bind UDP socket: %s", strerror(errno));
+            LOGE("Failed to bind UDP socket on port %d: %s", port, strerror(errno));
             close(socketFd_);
             socketFd_ = -1;
             cleanupOpus();
             running_ = false;
             return false;
         }
+        LOGI("UDP socket successfully bound to port %d", port);
 
         // 3. Initialize AAudio Playback
         AAudioStreamBuilder* builder = nullptr;
@@ -95,18 +100,32 @@ public:
         AAudioStreamBuilder_setChannelCount(builder, 2);
         AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_FLOAT);
         AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+        // Try EXCLUSIVE first for lowest latency; fall back to SHARED if unsupported
         AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE);
         AAudioStreamBuilder_setDataCallback(builder, dataCallback, this);
 
         result = AAudioStreamBuilder_openStream(builder, &playStream_);
+        if (result != AAUDIO_OK || !playStream_) {
+            LOGI("EXCLUSIVE mode failed (%d), retrying with SHARED mode...", result);
+            // Re-create builder for SHARED mode retry
+            AAudioStreamBuilder_delete(builder);
+            builder = nullptr;
+            AAudio_createStreamBuilder(&builder);
+            AAudioStreamBuilder_setSampleRate(builder, 48000);
+            AAudioStreamBuilder_setChannelCount(builder, 2);
+            AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_FLOAT);
+            AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+            AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_SHARED);
+            AAudioStreamBuilder_setDataCallback(builder, dataCallback, this);
+            result = AAudioStreamBuilder_openStream(builder, &playStream_);
+        }
         AAudioStreamBuilder_delete(builder);
 
         if (result != AAUDIO_OK || !playStream_) {
-            LOGE("Failed to open AAudio Playback Stream: %d", result);
-            cleanupSocket();
-            cleanupOpus();
-            running_ = false;
-            return false;
+            LOGE("Failed to open AAudio Playback Stream in both EXCLUSIVE and SHARED modes: %d", result);
+            // NOTE: We do NOT cleanupSocket here — keep the UDP receiver running
+            // even without audio so packet count is still visible for debugging.
+            LOGI("Continuing without audio playback — packets will be counted but not played.");
         }
 
         result = AAudioStream_requestStart(playStream_);

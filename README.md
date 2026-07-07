@@ -294,18 +294,20 @@ Download `AudioStream-arm64-v8a.apk` from the same releases page.
 **Linux:**
 ```
 cmake >= 3.22        GCC/Clang (C++17)     Python 3.10+
-libpulse-dev         libopus-dev            Flutter 3.x
+libpulse-dev         libopus-dev            pybind11
+Flutter 3.x
 ```
 
 Install system dependencies (Ubuntu/Debian):
 ```bash
-sudo apt install cmake gcc libpulse-dev libopus-dev python3-venv
+sudo apt install cmake gcc libpulse-dev libopus-dev python3-venv python3-pybind11
 ```
 
 **Windows:**
 ```
 CMake 3.22+          Visual Studio 2022 Build Tools (C++ workload)
-Python 3.10+         vcpkg (for Opus)        Flutter 3.x
+Python 3.10+         vcpkg (for Opus)        pybind11
+Flutter 3.x
 ```
 
 Install Windows prerequisites:
@@ -320,6 +322,9 @@ C:\vcpkg\vcpkg install opus:x64-windows
 
 # 3. Set environment variable for the build script
 [System.Environment]::SetEnvironmentVariable('VCPKG_ROOT','C:\vcpkg','User')
+
+# 4. Install pybind11 for system Python (required for C++ bindings compilation)
+pip install pybind11
 ```
 
 #### One-command build (Linux)

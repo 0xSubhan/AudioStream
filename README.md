@@ -487,7 +487,6 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ---
 
-
 ## Acknowledgments
 
 - [**libopus**](https://opus-codec.org/) — The Opus codec for incredible audio compression

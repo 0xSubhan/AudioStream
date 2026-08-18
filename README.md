@@ -167,6 +167,7 @@ Measured on a Ryzen 5 machine streaming to a Pixel 7 over 5GHz WiFi:
 
 > **Note:** Latency varies by network quality. A 5GHz WiFi connection with both devices close to the router gives the best results.
 
+
 ---
 
 ## How It Works
